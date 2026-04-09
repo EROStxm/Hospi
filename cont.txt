@@ -1,0 +1,185 @@
+¡Excelente idea! El sensor R307S es perfecto para usuarios que no tienen sensor en sus dispositivos. Aquí tienes un prompt completo y detallado para continuar el proyecto con cualquier IA:
+
+---
+
+## 📝 PROMPT COMPLETO PARA CONTINUAR EL PROYECTO
+
+```
+CONTEXTO DEL PROYECTO:
+Estoy desarrollando un Sistema de Gestión de Solicitudes de Mantenimiento para un Hospital Militar. El proyecto tiene 3 capas: Base de Datos MySQL, Backend Laravel 12, y Frontend React + Vite.
+
+ESTADO ACTUAL (COMPLETADO):
+✅ Base de datos MySQL completamente diseñada y poblada con datos de prueba
+✅ 8 roles del sistema: enfermera, enfermero_jefe, doctor, especialista, jefe_servicio, soporte_tecnico, jefe_soporte, admin_sistema
+✅ Backend Laravel 12 funcionando en http://localhost:8000/api
+✅ API REST con endpoints funcionales:
+   - POST /api/login (autenticación sin hash - temporal)
+   - CRUD completo de /api/roles
+   - Sanctum configurado con tabla personal_access_tokens
+✅ Frontend React + Vite en http://localhost:5173
+✅ Estructura en español:
+   - src/componentes/autenticacion/Login.jsx
+   - src/componentes/roles/ListaRoles.jsx, FormularioRol.jsx
+   - src/componentes/comunes/Navbar.jsx, Sidebar.jsx
+   - src/paginas/Dashboard.jsx, RolesPage.jsx
+   - src/servicios/authService.js, rolService.js, api.js
+   - src/estilos/global.css, login.css, dashboard.css, roles.css
+✅ Login funcional con código militar 9895625 / admin123 (usuario Erick - admin_sistema)
+✅ Dashboard con estadísticas de prueba
+✅ CRUD de Roles funcionando completamente
+
+DEPENDENCIAS INSTALADAS EN REACT:
+- jspdf (PDFs)
+- qrcode.react (generar QR)
+- @yudiel/react-qr-scanner (escanear QR)
+- react-hook-form + zod (formularios)
+- react-hot-toast (notificaciones)
+- react-icons (iconos)
+- date-fns (fechas)
+- recharts (gráficos)
+- axios (API calls)
+- react-router-dom (navegación)
+
+TABLAS EN BASE DE DATOS (MySQL):
+- roles (8 roles predefinidos)
+- usuarios (27 usuarios de prueba, incluyendo Erick 9895625)
+- sectores (8 sectores: UCI, Urgencias, Cardiología, etc.)
+- categorias_equipos (10 categorías)
+- equipos (12 equipos con código COS-10-XXX)
+- materiales (15 materiales con stock)
+- solicitudes (7 solicitudes en diferentes estados)
+- solicitudes_materiales (relación muchos a muchos)
+- comentarios_solicitudes
+- notificaciones
+- logs_actividad
+- personal_access_tokens (Sanctum)
+- rfid_logs (para Fase 2)
+- esp32_devices (para Fase 2)
+
+ESTRUCTURA DE LA TABLA solicitudes:
+- Campos básicos: tipo_solicitud (sin_material/con_material), titulo, descripcion, equipo_id
+- 5 firmas: solicitante, jefe_seccion, jefe_activos, conformacion, jefe_mantenimiento
+- Estados: pendiente_solicitante, pendiente_jefe_seccion, pendiente_jefe_activos, pendiente_soporte, asignado, en_proceso, pendiente_conformacion, pendiente_jefe_mantenimiento, completado, rechazado, archivado
+- Campos de asignación: tecnico_asignado_id, trabajo_terminado_en, notas_tecnico
+- PDF: pdf_generado_en, pdf_ruta, codigo_qr
+
+FLUJO DE SOLICITUDES:
+- SIN MATERIAL: Solicitante crea → firma con huella → va directo a soporte técnico
+- CON MATERIAL: Solicitante crea → firma con huella → jefe de sector firma con huella → jefe de activos firma → va a soporte técnico
+- Soporte asigna técnico → técnico trabaja → marca completado → sistema genera PDF con QR → se imprime para firma física → se escanea y archiva
+
+PRÓXIMAS TAREAS A IMPLEMENTAR (en orden de prioridad):
+
+1. CRUD DE SOLICITUDES (ALTA PRIORIDAD):
+   - Backend: Completar SolicitudController con todos los métodos
+   - Frontend: Crear src/paginas/SolicitudesPage.jsx
+   - Frontend: src/componentes/solicitudes/ListaSolicitudes.jsx
+   - Frontend: src/componentes/solicitudes/FormularioSolicitud.jsx
+   - Frontend: src/componentes/solicitudes/DetalleSolicitud.jsx
+   - Servicio: src/servicios/solicitudService.js
+
+2. FLUJO DE FIRMAS:
+   - Endpoint POST /api/solicitudes/{id}/firmar
+   - Lógica según estado actual y tipo de solicitud
+   - Frontend: Botones de firma según rol del usuario
+
+3. ASIGNACIÓN DE TÉCNICOS:
+   - Endpoint POST /api/solicitudes/{id}/asignar-tecnico
+   - Solo roles: jefe_soporte, admin_sistema
+   - Lista de técnicos disponibles (rol soporte_tecnico)
+
+4. GESTIÓN DE MATERIALES EN SOLICITUD:
+   - Endpoint POST /api/solicitudes/{id}/usar-material
+   - Validar stock disponible
+   - Actualizar inventario al usar
+
+5. PDF CON QR:
+   - Usar jspdf en el frontend
+   - Generar PDF al completar solicitud
+   - Incluir QR con datos de la solicitud
+   - Guardar ruta en base de datos
+
+6. ESCÁNER QR:
+   - Usar @yudiel/react-qr-scanner
+   - Verificar solicitudes escaneando QR
+
+7. DASHBOARD CON DATOS REALES:
+   - Reemplazar datos de prueba con API calls
+   - Gráficos con recharts mostrando estadísticas reales
+
+8. NOTIFICACIONES TOAST:
+   - Integrar react-hot-toast en todas las acciones CRUD
+
+HARDWARE FUTURO (FASE 2):
+- Sensor de huellas R307S para usuarios sin sensor en dispositivo
+- Se conectará vía ESP32 o Arduino
+- La tabla rfid_logs y esp32_devices ya están creadas
+
+NOTAS IMPORTANTES:
+- Backend usa Laravel 12 con PHP 8.2
+- Modelos tienen timestamps personalizados: CREATED_AT = 'creado_en', UPDATED_AT = 'actualizado_en'
+- La tabla usuarios usa 'contrasena' (sin hash - TEMPORAL)
+- El campo de autenticación es 'codigo_militar' (no email)
+- Sanctum configurado con tabla personal_access_tokens
+- Frontend en React 19 con Vite
+- Estilos en CSS puro (sin Tailwind)
+- Estructura de carpetas en español
+- Variables de entorno en .env: VITE_API_URL=http://localhost:8000/api
+
+USUARIO ADMIN PRINCIPAL:
+- Código militar: 9895625
+- Nombre: Erick Administrador
+- Contraseña: admin123
+- Rol: admin_sistema (ID 8)
+
+SOLICITUD: Continuar el desarrollo implementando el CRUD de Solicitudes como primera prioridad.
+```
+
+---
+
+## 🤖 PROMPT RESUMIDO PARA NUEVO CHAT
+
+```
+[CONTEXTO: Sistema de Mantenimiento Hospital Militar - 3 capas MySQL+Laravel+React]
+[ESTADO: Backend API y Frontend base funcionando. Login y CRUD Roles completos]
+[TABLAS: roles, usuarios, sectores, equipos, materiales, solicitudes(lista para usar)]
+[USUARIO: Erick/9895625/admin123 - admin_sistema]
+
+NECESITO implementar el CRUD de Solicitudes con:
+1. Endpoints Laravel para GET, POST, PUT de solicitudes
+2. Frontend React: ListaSolicitudes, FormularioSolicitud, DetalleSolicitud
+3. Filtros por estado, sector, fechas
+4. Flujo de firmas según tipo (sin_material/con_material)
+5. Asignación de técnicos
+6. Consumo de materiales con control de stock
+
+Código base: Modelo Solicitud ya creado con relaciones. Tabla poblada con 7 ejemplos.
+Frontend con axios configurado, rutas con react-router-dom.
+
+¿Puedes ayudarme a implementar el CRUD de Solicitudes completo?
+```
+
+---
+
+## 📂 ARCHIVOS CLAVE PARA CONTINUAR
+
+**Backend (Laravel):**
+```
+app/Models/Solicitud.php (ya creado con relaciones)
+app/Http/Controllers/Api/SolicitudController.php (a completar)
+routes/api.php (agregar rutas de solicitudes)
+```
+
+**Frontend (React):**
+```
+src/servicios/solicitudService.js (crear)
+src/paginas/SolicitudesPage.jsx (crear)
+src/componentes/solicitudes/ListaSolicitudes.jsx (crear)
+src/componentes/solicitudes/FormularioSolicitud.jsx (crear)
+src/componentes/solicitudes/DetalleSolicitud.jsx (crear)
+src/estilos/solicitudes.css (crear)
+```
+
+---
+
+Con este prompt, cualquier IA podrá entender exactamente dónde estamos y continuar el desarrollo sin perder contexto. ¡Nos vemos en el siguiente chat! 🚀
