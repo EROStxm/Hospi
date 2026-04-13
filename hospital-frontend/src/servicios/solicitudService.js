@@ -1,34 +1,56 @@
+// src/servicios/solicitudService.js
 import api from './api';
 
 export const solicitudService = {
   // Obtener MIS solicitudes (para app móvil y usuarios normales)
   obtenerMisSolicitudes: async (params = {}) => {
     const response = await api.get('/mis-solicitudes', { params });
-    return response.data;
+    // Si la respuesta tiene data.data, devolvemos eso, si no, la respuesta completa
+    const data = response.data;
+    return {
+      ...data,
+      data: data.data?.data || data.data || [] // Maneja tanto paginación como array directo
+    };
   },
 
   // Obtener solicitudes pendientes para soporte
   obtenerPendientesSoporte: async () => {
     const response = await api.get('/solicitudes-pendientes');
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      data: data.data?.data || data.data || []
+    };
   },
 
   // Obtener solicitudes de mi sector (jefe de servicio)
   obtenerPorSector: async () => {
     const response = await api.get('/solicitudes-sector');
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      data: data.data?.data || data.data || []
+    };
   },
 
   // Obtener solicitudes para firmar (jefe)
   obtenerParaFirmar: async () => {
     const response = await api.get('/solicitudes-para-firmar');
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      data: data.data?.data || data.data || []
+    };
   },
 
   // Obtener TODAS las solicitudes (admin)
   obtenerTodas: async (params = {}) => {
     const response = await api.get('/solicitudes', { params });
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      data: data.data?.data || data.data || []
+    };
   },
 
   // Obtener detalle de una solicitud

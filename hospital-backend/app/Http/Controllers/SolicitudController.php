@@ -42,6 +42,7 @@ class SolicitudController extends Controller
     /**
      * Ver MIS solicitudes (cualquier usuario)
      */
+    // En SolicitudController.php - método misSolicitudes
     public function misSolicitudes(Request $request)
     {
         $user = $request->user();
@@ -53,11 +54,12 @@ class SolicitudController extends Controller
             $query->where('estado', $request->estado);
         }
         
-        $solicitudes = $query->orderBy('creado_en', 'desc')->paginate(10);
+        // Cambiar paginate() por get() para desarrollo
+        $solicitudes = $query->orderBy('creado_en', 'desc')->get();
         
         return response()->json([
             'success' => true,
-            'data' => $solicitudes
+            'data' => $solicitudes  // Ahora es un array directo
         ]);
     }
 

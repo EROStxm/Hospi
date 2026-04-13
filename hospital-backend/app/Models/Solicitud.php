@@ -59,6 +59,7 @@ class Solicitud extends Model
         'pdf_generado_en' => 'datetime',
     ];
 
+    // Relaciones
     public function solicitante()
     {
         return $this->belongsTo(User::class, 'solicitante_id');
@@ -84,9 +85,26 @@ class Solicitud extends Model
         return $this->belongsTo(User::class, 'jefe_seccion_id');
     }
 
+    public function jefeActivos()
+    {
+        return $this->belongsTo(User::class, 'jefe_activos_id');
+    }
+
+    public function conformacion()
+    {
+        return $this->belongsTo(User::class, 'conformacion_id');
+    }
+
+    public function jefeMantenimiento()
+    {
+        return $this->belongsTo(User::class, 'jefe_mantenimiento_id');
+    }
+
     public function materiales()
     {
         return $this->belongsToMany(Material::class, 'solicitudes_materiales', 'solicitud_id', 'material_id')
                     ->withPivot('cantidad_usada', 'registrado_por_id', 'notas');
     }
+
+    
 }

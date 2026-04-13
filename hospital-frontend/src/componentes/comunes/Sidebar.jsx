@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
+import './Sidebar.css';
 
-const Sidebar = ({ usuario }) => {
+const Sidebar = ({ usuario, isOpen, onClose }) => {
   const location = useLocation();
   const rol = usuario?.rol?.nombre;
   
@@ -50,21 +51,34 @@ const Sidebar = ({ usuario }) => {
 
   const allMenuItems = [...menuItems, ...getMenuByRole()];
 
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-menu">
-        {allMenuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-          >
-            <span className="sidebar-icon">{item.icon}</span>
-            <span className="sidebar-text">{item.label}</span>
-          </Link>
-        ))}
-      </div>
-    </aside>
+    <>
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h3>Menú Principal</h3>
+          <button className="sidebar-close" onClick={onClose}>×</button>
+        </div>
+        <div className="sidebar-menu">
+          {allMenuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => {
+                if (window.innerWidth <= 768) {
+                  onClose();
+                }
+              }}
+            >
+              <span className="sidebar-icon">{item.icon}</span>
+              <span className="sidebar-text">{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </aside>
+      {isOpen && <div className="sidebar-overlay" onClick={onClose}></div>}
+    </>
   );
 };
 

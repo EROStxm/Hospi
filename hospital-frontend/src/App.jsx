@@ -1,12 +1,13 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { authService } from './servicios/authService';
 import Login from './componentes/autenticacion/Login';
 import Dashboard from './paginas/Dashboard';
 import RolesPage from './paginas/RolesPage';
+import MisSolicitudesPage from './paginas/MisSolicitudesPage';
+import Layout from './componentes/comunes/Layout.jsx';
 import './estilos/global.css';
 
-// Componente wrapper para manejar la navegación
 function AppContent() {
   const [autenticado, setAutenticado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -57,6 +58,13 @@ function AppContent() {
     );
   }
 
+  // Layout wrapper para páginas protegidas
+  const ProtectedLayout = ({ children }) => (
+    <Layout usuario={usuario} onLogout={manejarLogout}>
+      {children}
+    </Layout>
+  );
+
   return (
     <Routes>
       <Route 
@@ -74,7 +82,9 @@ function AppContent() {
         path="/dashboard" 
         element={
           autenticado ? (
-            <Dashboard usuario={usuario} onLogout={manejarLogout} />
+            <ProtectedLayout>
+              <Dashboard usuario={usuario} />
+            </ProtectedLayout>
           ) : (
             <Navigate to="/login" replace />
           )
@@ -85,13 +95,28 @@ function AppContent() {
         path="/roles" 
         element={
           autenticado ? (
-            <RolesPage onLogout={manejarLogout} />
+            <ProtectedLayout>
+              <RolesPage />
+            </ProtectedLayout>
           ) : (
             <Navigate to="/login" replace />
           )
         } 
       />
       
+      <Route
+        path="/mis-solicitudes"
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <MisSolicitudesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
       <Route 
         path="/" 
         element={<Navigate to={autenticado ? "/dashboard" : "/login"} replace />} 
