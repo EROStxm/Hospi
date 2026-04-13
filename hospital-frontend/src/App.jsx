@@ -9,6 +9,9 @@ import MisSolicitudesPage from './paginas/MisSolicitudesPage';
 import Layout from './componentes/comunes/Layout.jsx';
 import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
 import TodasSolicitudesPage from './paginas/TodasSolicitudesPage';
+import UsuariosPage from './paginas/UsuariosPage';
+import EquiposPage from './paginas/EquiposPage';
+
 // ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
 import './estilos/global.css';
 
@@ -140,6 +143,30 @@ function AppContent() {
           autenticado ? (
             <ProtectedLayout>
               <NuevaSolicitudPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/equipos" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <EquiposPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/usuarios" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <UsuariosPage />
             </ProtectedLayout>
           ) : (
             <Navigate to="/login" replace />
