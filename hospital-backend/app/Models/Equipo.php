@@ -1,18 +1,34 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 
 class Equipo extends Model
 {
     protected $table = 'equipos';
     public $timestamps = true;
+    
     const CREATED_AT = 'creado_en';
     const UPDATED_AT = 'actualizado_en';
 
     protected $fillable = [
-        'codigo_equipo', 'nombre', 'descripcion', 'categoria_id',
-        'sector_id', 'marca', 'modelo', 'numero_serie', 'estado',
+        'codigo_equipo', 
+        'nombre', 
+        'descripcion', 
+        'categoria_id',
+        'sector_id', 
+        'marca', 
+        'modelo', 
+        'numero_serie', 
+        'estado',
         'fecha_adquisicion'
+    ];
+
+    protected $casts = [
+        'fecha_adquisicion' => 'date',
+        'creado_en' => 'datetime',
+        'actualizado_en' => 'datetime',
     ];
 
     public function categoria()

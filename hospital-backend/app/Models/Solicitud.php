@@ -57,6 +57,8 @@ class Solicitud extends Model
         'tecnico_asignado_en' => 'datetime',
         'trabajo_terminado_en' => 'datetime',
         'pdf_generado_en' => 'datetime',
+        'creado_en' => 'datetime',
+        'actualizado_en' => 'datetime',
     ];
 
     // Relaciones
@@ -105,6 +107,4 @@ class Solicitud extends Model
         return $this->belongsToMany(Material::class, 'solicitudes_materiales', 'solicitud_id', 'material_id')
                     ->withPivot('cantidad_usada', 'registrado_por_id', 'notas');
     }
-
-    
 }

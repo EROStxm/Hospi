@@ -18,6 +18,7 @@ const MisSolicitudesPage = () => {
     enProceso: 0,
     completadas: 0
   });
+  const [usandoMock, setUsandoMock] = useState(false);
 
   const estadosConfig = {
     pendiente_solicitante: { label: 'Pendiente', color: '#f59e0b', icon: <FiClock /> },
@@ -33,6 +34,80 @@ const MisSolicitudesPage = () => {
     rechazado: { label: 'Rechazado', color: '#ef4444', icon: <FiAlertCircle /> }
   };
 
+  // Datos mock para desarrollo
+  const MOCK_SOLICITUDES = [
+    {
+      id: 1,
+      titulo: "Monitor no enciende",
+      descripcion: "El monitor de signos vitales no enciende al presionar el botón de encendido",
+      estado: "completado",
+      tipo_solicitud: "sin_material",
+      creado_en: "2024-01-10 08:30:00",
+      equipo: { nombre: "Monitor Signos Vitales UCI 01" },
+      sector: { nombre: "UCI" }
+    },
+    {
+      id: 2,
+      titulo: "Ventilador con alarma de presión",
+      descripcion: "El ventilador mecánico muestra alarma de presión alta intermitente",
+      estado: "pendiente_jefe_seccion",
+      tipo_solicitud: "con_material",
+      creado_en: "2024-01-15 09:15:00",
+      equipo: { nombre: "Ventilador UCI 01" },
+      sector: { nombre: "UCI" }
+    },
+    {
+      id: 3,
+      titulo: "Desfibrilador no carga",
+      descripcion: "El desfibrilador no carga al presionar botón de carga",
+      estado: "asignado",
+      tipo_solicitud: "sin_material",
+      creado_en: "2024-01-15 14:20:00",
+      equipo: { nombre: "Desfibrilador Urgencias" },
+      sector: { nombre: "Urgencias" }
+    },
+    {
+      id: 4,
+      titulo: "Monitor pediátrico con pantalla parpadeante",
+      descripcion: "La pantalla del monitor pediátrico parpadea constantemente dificultando la lectura",
+      estado: "pendiente_solicitante",
+      tipo_solicitud: "con_material",
+      creado_en: "2024-01-14 11:00:00",
+      equipo: { nombre: "Monitor Pediátrico" },
+      sector: { nombre: "Pediatría" }
+    },
+    {
+      id: 5,
+      titulo: "Autoclave no alcanza temperatura",
+      descripcion: "El autoclave no alcanza la temperatura de esterilización requerida",
+      estado: "en_proceso",
+      tipo_solicitud: "con_material",
+      creado_en: "2024-01-14 10:00:00",
+      equipo: { nombre: "Autoclave Central" },
+      sector: { nombre: "Esterilización" }
+    },
+    {
+      id: 7,
+      titulo: "Solicitud duplicada - Cancelar",
+      descripcion: "Esta solicitud ya fue reportada en el ticket #001",
+      estado: "rechazado",
+      tipo_solicitud: "con_material",
+      creado_en: "2024-01-16 08:00:00",
+      equipo: { nombre: "Bomba de Infusión" },
+      sector: { nombre: "Cardiología" }
+    },
+    {
+      id: 8,
+      titulo: "Rayos X portátil no emite radiación",
+      descripcion: "El equipo de rayos X portátil no emite radiación al disparar",
+      estado: "pendiente_conformacion",
+      tipo_solicitud: "sin_material",
+      creado_en: "2024-01-13 09:00:00",
+      equipo: { nombre: "Rayos X Portátil" },
+      sector: { nombre: "Radiología" }
+    }
+  ];
+
   useEffect(() => {
     cargarMisSolicitudes();
   }, []);
@@ -44,27 +119,56 @@ const MisSolicitudesPage = () => {
   const cargarMisSolicitudes = async () => {
     try {
       setCargando(true);
+      setUsandoMock(false);
+      
+      console.log('🔄 Intentando cargar solicitudes del backend...');
+      
       const response = await solicitudService.obtenerMisSolicitudes();
+      
+      console.log('📦 Respuesta del backend:', response);
       
       // Manejar diferentes estructuras de respuesta
       let solicitudesData = [];
+      
       if (response?.data) {
         if (Array.isArray(response.data)) {
           solicitudesData = response.data;
         } else if (response.data.data && Array.isArray(response.data.data)) {
           solicitudesData = response.data.data;
+        } else if (response.data.data?.data && Array.isArray(response.data.data.data)) {
+          solicitudesData = response.data.data.data;
         }
       } else if (Array.isArray(response)) {
         solicitudesData = response;
       }
       
-      console.log('📊 Solicitudes cargadas:', solicitudesData);
+      // Si no hay datos, usar mock
+      if (solicitudesData.length === 0) {
+        console.log('⚠️ Backend devolvió array vacío, usando datos mock');
+        setSolicitudes(MOCK_SOLICITUDES);
+        calcularEstadisticas(MOCK_SOLICITUDES);
+        setUsandoMock(true);
+        toast.success('Mostrando datos de demostración');
+      } else {
+        console.log('✅ Datos reales cargados:', solicitudesData.length);
+        setSolicitudes(solicitudesData);
+        calcularEstadisticas(solicitudesData);
+        toast.success(`${solicitudesData.length} solicitudes cargadas`);
+      }
       
-      setSolicitudes(solicitudesData);
-      calcularEstadisticas(solicitudesData);
     } catch (error) {
-      console.error('❌ Error al cargar solicitudes:', error);
-      toast.error('Error al cargar tus solicitudes');
+      console.error('❌ Error 500 del backend, usando datos mock:', error.message);
+      
+      // Siempre mostrar datos mock en caso de error
+      setSolicitudes(MOCK_SOLICITUDES);
+      calcularEstadisticas(MOCK_SOLICITUDES);
+      setUsandoMock(true);
+      
+      // Mostrar mensaje informativo
+      toast.error('Backend no disponible - Mostrando datos de demostración', {
+        duration: 4000
+      });
+      
     } finally {
       setCargando(false);
     }
@@ -135,6 +239,46 @@ const MisSolicitudesPage = () => {
     navigate(`/solicitudes/${id}`);
   };
 
+  const handleCrearSolicitudPrueba = async () => {
+    try {
+      const nuevaSolicitud = {
+        tipo_solicitud: 'sin_material',
+        titulo: 'Solicitud de prueba ' + new Date().toLocaleTimeString(),
+        descripcion: 'Esta es una solicitud creada desde el botón de prueba',
+        equipo_id: 5,
+        sector_id: 3
+      };
+      
+      toast.loading('Creando solicitud...');
+      const response = await solicitudService.crear(nuevaSolicitud);
+      console.log('✅ Solicitud creada:', response);
+      toast.dismiss();
+      toast.success('¡Solicitud creada correctamente!');
+      
+      // Intentar recargar
+      cargarMisSolicitudes();
+    } catch (error) {
+      console.error('❌ Error al crear solicitud:', error);
+      toast.dismiss();
+      
+      // Agregar mock localmente
+      const nuevaMock = {
+        id: Date.now(),
+        titulo: nuevaSolicitud.titulo,
+        descripcion: nuevaSolicitud.descripcion,
+        estado: "pendiente_solicitante",
+        tipo_solicitud: nuevaSolicitud.tipo_solicitud,
+        creado_en: new Date().toISOString(),
+        equipo: { nombre: "Equipo de prueba" },
+        sector: { nombre: "Sector de prueba" }
+      };
+      
+      setSolicitudes([nuevaMock, ...solicitudes]);
+      calcularEstadisticas([nuevaMock, ...solicitudes]);
+      toast.success('Solicitud agregada localmente (modo demo)');
+    }
+  };
+
   if (cargando) {
     return (
       <div className="loading-container">
@@ -147,17 +291,27 @@ const MisSolicitudesPage = () => {
   return (
     <div className="mis-solicitudes-page">
       {/* Header */}
-    <div className="page-header">
-      <div className="header-content">
-        <h1>Mis Solicitudes</h1>
-        <p className="subtitle">Gestiona y da seguimiento a tus solicitudes</p>
+      <div className="page-header">
+        <div className="header-content">
+          <h1>Mis Solicitudes</h1>
+          <p className="subtitle">Gestiona y da seguimiento a tus solicitudes</p>
+          {usandoMock && (
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              background: '#fef3c7',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#d97706'
+            }}>
+              ⚠️ Modo demostración - Los datos son simulados
+            </div>
+          )}
+        </div>
       </div>
-    </div>
 
       {/* Estadísticas rápidas */}
-      
       <div className="stats-container">
-        
         <div className="stat-card" onClick={() => setFiltroActivo('todas')}>
           <div className="stat-icon">📋</div>
           <div className="stat-info">
@@ -216,6 +370,27 @@ const MisSolicitudesPage = () => {
             Completadas
           </button>
         </div>
+      </div>
+
+      {/* Botón para crear solicitud de prueba */}
+      <div style={{ padding: '0 20px', marginBottom: '15px' }}>
+        <button 
+          onClick={handleCrearSolicitudPrueba}
+          style={{ 
+            width: '100%',
+            padding: '12px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+          }}
+        >
+          🧪 Crear Solicitud de Prueba
+        </button>
       </div>
 
       {/* Lista de solicitudes */}

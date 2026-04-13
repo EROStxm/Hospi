@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { rolService } from '../servicios/rolService';
 import ListaRoles from '../componentes/roles/ListaRoles';
 import FormularioRol from '../componentes/roles/FormularioRol';
-import Navbar from '../componentes/comunes/Navbar';
-import Sidebar from '../componentes/comunes/Sidebar';
 import '../estilos/roles.css';
 
 const RolesPage = () => {

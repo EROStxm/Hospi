@@ -7,6 +7,7 @@ use App\Models\Solicitud;
 use App\Models\User;
 use App\Models\Material;
 use App\Models\Equipo;
+use App\Models\Sector;
 use Illuminate\Http\Request;
 
 class SolicitudController extends Controller
@@ -18,7 +19,6 @@ class SolicitudController extends Controller
     {
         $query = Solicitud::with(['solicitante', 'sector', 'equipo', 'tecnicoAsignado']);
         
-        // Filtros
         if ($request->has('estado')) {
             $query->where('estado', $request->estado);
         }
@@ -42,24 +42,32 @@ class SolicitudController extends Controller
     /**
      * Ver MIS solicitudes (cualquier usuario)
      */
-    // En SolicitudController.php - método misSolicitudes
     public function misSolicitudes(Request $request)
     {
         $user = $request->user();
         
-        $query = Solicitud::with(['sector', 'equipo', 'tecnicoAsignado'])
-                    ->where('solicitante_id', $user->id);
-        
-        if ($request->has('estado')) {
-            $query->where('estado', $request->estado);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no autenticado',
+                'data' => []
+            ], 401);
         }
         
-        // Cambiar paginate() por get() para desarrollo
-        $solicitudes = $query->orderBy('creado_en', 'desc')->get();
+        // Consulta simple
+        $solicitudes = Solicitud::where('solicitante_id', $user->id)
+                        ->orderBy('creado_en', 'desc')
+                        ->get();
+        
+        // Cargar relaciones manualmente
+        foreach ($solicitudes as $solicitud) {
+            $solicitud->equipo = Equipo::find($solicitud->equipo_id);
+            $solicitud->sector = Sector::find($solicitud->sector_id);
+        }
         
         return response()->json([
             'success' => true,
-            'data' => $solicitudes  // Ahora es un array directo
+            'data' => $solicitudes
         ]);
     }
 
@@ -71,16 +79,15 @@ class SolicitudController extends Controller
         $query = Solicitud::with(['solicitante', 'sector', 'equipo'])
                     ->whereIn('estado', ['pendiente_soporte', 'asignado', 'en_proceso']);
         
-        // Si es técnico, solo ver las asignadas a él
         $user = $request->user();
-        if ($user->rol->nombre === 'soporte_tecnico') {
+        if ($user && $user->rol && $user->rol->nombre === 'soporte_tecnico') {
             $query->where(function($q) use ($user) {
                 $q->where('tecnico_asignado_id', $user->id)
                   ->orWhere('estado', 'pendiente_soporte');
             });
         }
         
-        $solicitudes = $query->orderBy('creado_en', 'desc')->paginate(15);
+        $solicitudes = $query->orderBy('creado_en', 'desc')->get();
         
         return response()->json([
             'success' => true,
@@ -102,10 +109,10 @@ class SolicitudController extends Controller
             ], 400);
         }
         
-        $query = Solicitud::with(['solicitante', 'equipo', 'tecnicoAsignado'])
-                    ->where('sector_id', $user->sector_id);
-        
-        $solicitudes = $query->orderBy('creado_en', 'desc')->paginate(15);
+        $solicitudes = Solicitud::with(['solicitante', 'equipo'])
+                    ->where('sector_id', $user->sector_id)
+                    ->orderBy('creado_en', 'desc')
+                    ->get();
         
         return response()->json([
             'success' => true,
@@ -120,11 +127,11 @@ class SolicitudController extends Controller
     {
         $user = $request->user();
         
-        $query = Solicitud::with(['solicitante', 'equipo'])
+        $solicitudes = Solicitud::with(['solicitante', 'equipo'])
                     ->where('sector_id', $user->sector_id)
-                    ->where('estado', 'pendiente_jefe_seccion');
-        
-        $solicitudes = $query->orderBy('creado_en', 'asc')->get();
+                    ->where('estado', 'pendiente_jefe_seccion')
+                    ->orderBy('creado_en', 'asc')
+                    ->get();
         
         return response()->json([
             'success' => true,
@@ -133,7 +140,7 @@ class SolicitudController extends Controller
     }
 
     /**
-     * Crear nueva solicitud (desde app móvil o web)
+     * Crear nueva solicitud
      */
     public function store(Request $request)
     {
@@ -159,8 +166,8 @@ class SolicitudController extends Controller
             'estado' => 'pendiente_solicitante',
         ]);
 
-        // Cargar relaciones
-        $solicitud->load(['solicitante', 'sector', 'equipo']);
+        $solicitud->equipo = Equipo::find($solicitud->equipo_id);
+        $solicitud->sector = Sector::find($solicitud->sector_id);
 
         return response()->json([
             'success' => true,
@@ -175,25 +182,20 @@ class SolicitudController extends Controller
     public function show($id, Request $request)
     {
         $user = $request->user();
-        $solicitud = Solicitud::with([
-            'solicitante', 
-            'sector', 
-            'equipo', 
-            'tecnicoAsignado',
-            'jefeSeccion',
-            'jefeActivos',
-            'conformacion',
-            'jefeMantenimiento',
-            'materiales',
-            'comentarios.usuario'
-        ])->findOrFail($id);
+        $solicitud = Solicitud::findOrFail($id);
+        
+        // Cargar relaciones manualmente
+        $solicitud->solicitante = User::find($solicitud->solicitante_id);
+        $solicitud->sector = Sector::find($solicitud->sector_id);
+        $solicitud->equipo = Equipo::find($solicitud->equipo_id);
+        $solicitud->tecnicoAsignado = User::find($solicitud->tecnico_asignado_id);
 
         // Verificar permisos
         $puedeVer = false;
         
         if ($user->rol->nombre === 'admin_sistema') {
             $puedeVer = true;
-        } elseif ($user->rol->nombre === 'jefe_soporte' || $user->rol->nombre === 'soporte_tecnico') {
+        } elseif (in_array($user->rol->nombre, ['jefe_soporte', 'soporte_tecnico'])) {
             $puedeVer = true;
         } elseif ($user->rol->nombre === 'jefe_servicio' && $solicitud->sector_id === $user->sector_id) {
             $puedeVer = true;
@@ -215,7 +217,7 @@ class SolicitudController extends Controller
     }
 
     /**
-     * Firmar solicitud (según el rol que corresponda)
+     * Firmar solicitud
      */
     public function firmar(Request $request, $id)
     {
@@ -224,7 +226,6 @@ class SolicitudController extends Controller
         
         switch ($solicitud->estado) {
             case 'pendiente_solicitante':
-                // Solo el solicitante puede firmar
                 if ($solicitud->solicitante_id !== $user->id) {
                     return response()->json(['message' => 'Solo el solicitante puede firmar'], 403);
                 }
@@ -240,7 +241,6 @@ class SolicitudController extends Controller
                 break;
 
             case 'pendiente_jefe_seccion':
-                // Solo jefe de servicio del mismo sector
                 if (!$user->rol->puede_aprobar_material || $solicitud->sector_id !== $user->sector_id) {
                     return response()->json(['message' => 'No autorizado para firmar'], 403);
                 }
@@ -254,7 +254,6 @@ class SolicitudController extends Controller
                 break;
 
             case 'pendiente_jefe_activos':
-                // Solo jefe de soporte o admin
                 if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
                     return response()->json(['message' => 'No autorizado para firmar'], 403);
                 }
@@ -268,7 +267,6 @@ class SolicitudController extends Controller
                 break;
 
             case 'pendiente_conformacion':
-                // Solo el solicitante puede dar conformidad
                 if ($solicitud->solicitante_id !== $user->id) {
                     return response()->json(['message' => 'Solo el solicitante puede dar conformidad'], 403);
                 }
@@ -283,7 +281,6 @@ class SolicitudController extends Controller
                 break;
 
             case 'pendiente_jefe_mantenimiento':
-                // Solo jefe de soporte o admin
                 if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
                     return response()->json(['message' => 'No autorizado para firmar'], 403);
                 }
@@ -308,7 +305,7 @@ class SolicitudController extends Controller
     }
 
     /**
-     * Asignar técnico a solicitud
+     * Asignar técnico
      */
     public function asignarTecnico(Request $request, $id)
     {
@@ -316,15 +313,12 @@ class SolicitudController extends Controller
             'tecnico_id' => 'required|exists:usuarios,id'
         ]);
 
-        $user = $request->user();
         $solicitud = Solicitud::findOrFail($id);
         
-        // Verificar que la solicitud esté en estado pendiente_soporte
         if ($solicitud->estado !== 'pendiente_soporte') {
             return response()->json(['message' => 'La solicitud no está pendiente de asignación'], 400);
         }
 
-        // Verificar que el técnico tenga rol soporte_tecnico
         $tecnico = User::find($request->tecnico_id);
         if ($tecnico->rol->nombre !== 'soporte_tecnico') {
             return response()->json(['message' => 'El usuario seleccionado no es técnico'], 400);
@@ -355,7 +349,6 @@ class SolicitudController extends Controller
         $user = $request->user();
         $solicitud = Solicitud::findOrFail($id);
         
-        // Verificar que el técnico asignado sea el usuario actual
         if ($solicitud->tecnico_asignado_id !== $user->id) {
             return response()->json(['message' => 'Solo el técnico asignado puede completar el trabajo'], 403);
         }
@@ -392,11 +385,10 @@ class SolicitudController extends Controller
             
             if ($material->stock < $item['cantidad']) {
                 return response()->json([
-                    'message' => "Stock insuficiente para {$material->nombre}. Disponible: {$material->stock}"
+                    'message' => "Stock insuficiente para {$material->nombre}"
                 ], 400);
             }
 
-            // Registrar uso
             $solicitud->materiales()->attach($material->id, [
                 'cantidad_usada' => $item['cantidad'],
                 'registrado_por_id' => $user->id,
@@ -404,7 +396,6 @@ class SolicitudController extends Controller
                 'notas' => $item['notas'] ?? null,
             ]);
 
-            // Actualizar stock
             $material->decrement('stock', $item['cantidad']);
         }
 
