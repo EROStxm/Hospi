@@ -116,59 +116,49 @@ const MisSolicitudesPage = () => {
     filtrarSolicitudes();
   }, [filtroActivo, solicitudes]);
 
+// En MisSolicitudesPage.jsx
   const cargarMisSolicitudes = async () => {
     try {
       setCargando(true);
-      setUsandoMock(false);
-      
-      console.log('🔄 Intentando cargar solicitudes del backend...');
-      
       const response = await solicitudService.obtenerMisSolicitudes();
       
       console.log('📦 Respuesta del backend:', response);
       
-      // Manejar diferentes estructuras de respuesta
       let solicitudesData = [];
-      
       if (response?.data) {
         if (Array.isArray(response.data)) {
           solicitudesData = response.data;
         } else if (response.data.data && Array.isArray(response.data.data)) {
           solicitudesData = response.data.data;
-        } else if (response.data.data?.data && Array.isArray(response.data.data.data)) {
-          solicitudesData = response.data.data.data;
         }
-      } else if (Array.isArray(response)) {
-        solicitudesData = response;
       }
       
-      // Si no hay datos, usar mock
-      if (solicitudesData.length === 0) {
-        console.log('⚠️ Backend devolvió array vacío, usando datos mock');
-        setSolicitudes(MOCK_SOLICITUDES);
-        calcularEstadisticas(MOCK_SOLICITUDES);
-        setUsandoMock(true);
-        toast.success('Mostrando datos de demostración');
-      } else {
-        console.log('✅ Datos reales cargados:', solicitudesData.length);
-        setSolicitudes(solicitudesData);
-        calcularEstadisticas(solicitudesData);
-        toast.success(`${solicitudesData.length} solicitudes cargadas`);
-      }
+      console.log('📊 Solicitudes cargadas:', solicitudesData);
       
+      setSolicitudes(solicitudesData);
+      calcularEstadisticas(solicitudesData);
+      
+      toast.success(`${solicitudesData.length} solicitudes cargadas`);
     } catch (error) {
-      console.error('❌ Error 500 del backend, usando datos mock:', error.message);
+      console.error('❌ Error:', error);
       
-      // Siempre mostrar datos mock en caso de error
-      setSolicitudes(MOCK_SOLICITUDES);
-      calcularEstadisticas(MOCK_SOLICITUDES);
-      setUsandoMock(true);
+      // Si hay error, usar datos mock
+      const mockSolicitudes = [
+        {
+          id: 1,
+          titulo: "Monitor NONOno enciende",
+          descripcion: "El monitor de signos vitales no enciende",
+          estado: "completado",
+          tipo_solicitud: "sin_material",
+          creado_en: "2024-01-10 08:30:00",
+          equipo: { nombre: "Monitor Signos Vitales" },
+          sector: { nombre: "UCI" }
+        }
+      ];
       
-      // Mostrar mensaje informativo
-      toast.error('Backend no disponible - Mostrando datos de demostración', {
-        duration: 4000
-      });
-      
+      setSolicitudes(mockSolicitudes);
+      calcularEstadisticas(mockSolicitudes);
+      toast.error('Usando datos de demostración');
     } finally {
       setCargando(false);
     }

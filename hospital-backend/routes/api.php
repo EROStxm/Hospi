@@ -105,5 +105,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/sectores', [SectorController::class, 'index']);
         Route::get('/tecnicos', [UserController::class, 'tecnicos']);
     });
+
+    // Rutas adicionales para Equipos
+    Route::get('/equipos/sector/{sectorId}', [EquipoController::class, 'porSector']);
+    Route::get('/equipos/categoria/{categoriaId}', [EquipoController::class, 'porCategoria']);
+
+    // Rutas adicionales para Materiales
+    Route::post('/materiales/{id}/ajustar-stock', [MaterialController::class, 'ajustarStock']);
+    Route::get('/materiales-stock-bajo', [MaterialController::class, 'stockBajo']);
+
+    // Cambiar contraseña de usuario
+    Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
     
 });

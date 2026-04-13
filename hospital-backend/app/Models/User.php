@@ -14,7 +14,6 @@ class User extends Authenticatable
     protected $primaryKey = 'id';
     public $timestamps = true;
     
-    // IMPORTANTE: Especificar los nombres de las columnas de timestamps
     const CREATED_AT = 'creado_en';
     const UPDATED_AT = 'actualizado_en';
 
@@ -62,13 +61,30 @@ class User extends Authenticatable
         return $this->belongsTo(Sector::class, 'sector_id');
     }
 
+    // MÉTODOS DE PERMISOS - CORREGIDOS
     public function puedeAprobarMaterial()
     {
-        return $this->rol && $this->rol->puede_aprobar_material;
+        return $this->rol ? (bool) $this->rol->puede_aprobar_material : false;
     }
 
     public function puedeAsignarTecnico()
     {
-        return $this->rol && $this->rol->puede_asignar_tecnico;
+        return $this->rol ? (bool) $this->rol->puede_asignar_tecnico : false;
+    }
+    
+    public function puedeGestionarInventario()
+    {
+        return $this->rol ? (bool) $this->rol->puede_gestionar_inventario : false;
+    }
+    
+    public function puedeVerTodasSolicitudes()
+    {
+        return $this->rol ? (bool) $this->rol->puede_ver_todas_solicitudes : false;
+    }
+    
+    // Accesor para obtener el nombre del rol
+    public function getRolNombreAttribute()
+    {
+        return $this->rol ? $this->rol->nombre : null;
     }
 }

@@ -11,14 +11,25 @@ class CheckRole
     {
         $user = $request->user();
         
-        if (!$user || !$user->rol) {
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'No autorizado'
+                'message' => 'No autenticado'
+            ], 401);
+        }
+        
+        // Cargar el rol si no está cargado
+        if (!$user->relationLoaded('rol')) {
+            $user->load('rol');
+        }
+        
+        if (!$user->rol) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario sin rol asignado'
             ], 403);
         }
 
-        // Verificar si el rol del usuario está en la lista permitida
         if (!in_array($user->rol->nombre, $roles)) {
             return response()->json([
                 'success' => false,

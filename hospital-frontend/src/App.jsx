@@ -1,3 +1,4 @@
+// src/App.jsx - CORREGIDO
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { authService } from './servicios/authService';
@@ -6,6 +7,9 @@ import Dashboard from './paginas/Dashboard';
 import RolesPage from './paginas/RolesPage';
 import MisSolicitudesPage from './paginas/MisSolicitudesPage';
 import Layout from './componentes/comunes/Layout.jsx';
+import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
+import TodasSolicitudesPage from './paginas/TodasSolicitudesPage';
+// ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
 import './estilos/global.css';
 
 function AppContent() {
@@ -115,6 +119,32 @@ function AppContent() {
             <Navigate to="/login" replace />
           )
         }
+      />
+
+      <Route 
+        path="/solicitudes" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <TodasSolicitudesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+
+      <Route 
+        path="/nueva-solicitud" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <NuevaSolicitudPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
       />
 
       <Route 
