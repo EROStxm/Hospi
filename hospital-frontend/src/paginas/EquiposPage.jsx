@@ -12,6 +12,9 @@ const EquiposPage = () => {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [equipoEditando, setEquipoEditando] = useState(null);
+
+  const [ubicaciones, setUbicaciones] = useState([]);
+  const [ubicacionesFiltradas, setUbicacionesFiltradas] = useState([]);
   
   // Filtros
   const [search, setSearch] = useState('');
@@ -25,6 +28,7 @@ const EquiposPage = () => {
     descripcion: '',
     categoria_id: '1',
     sector_id: '',
+    ubicacion_id: '',
     marca: '',
     modelo: '',
     numero_serie: '',
@@ -36,9 +40,20 @@ const EquiposPage = () => {
   // Obtener marcas únicas para el filtro
   const marcasUnicas = [...new Set(equipos.map(e => e.marca).filter(Boolean))];
 
+  // Filtrar ubicaciones cuando cambia el sector seleccionado
+  useEffect(() => {
+    if (formData.sector_id && Array.isArray(ubicaciones)) {
+      const filtradas = ubicaciones.filter(u => u.sector_id == formData.sector_id);
+      setUbicacionesFiltradas(filtradas);
+    } else {
+      setUbicacionesFiltradas([]);
+    }
+  }, [formData.sector_id, ubicaciones]);
+
   useEffect(() => {
     cargarEquipos();
     cargarSectores();
+    cargarUbicaciones();
   }, []);
 
   useEffect(() => {
@@ -80,6 +95,23 @@ const EquiposPage = () => {
       }
     } catch (error) {
       console.error('Error cargando sectores:', error);
+    }
+  };
+
+  const cargarUbicaciones = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8000/api/ubicaciones', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        const datos = data.data?.data || data.data || data;
+        setUbicaciones(Array.isArray(datos) ? datos : []);
+      }
+    } catch (error) {
+      console.error('Error cargando ubicaciones:', error);
     }
   };
 
@@ -142,7 +174,7 @@ const EquiposPage = () => {
         setEquipoEditando(null);
         setFormData({
           codigo_equipo: '', nombre: '', descripcion: '', categoria_id: '1',
-          sector_id: '', marca: '', modelo: '', numero_serie: '', estado: 'operativo'
+          sector_id: '', ubicacion_id: '', marca: '', modelo: '', numero_serie: '', estado: 'operativo'
         });
         cargarEquipos();
       }
@@ -155,7 +187,8 @@ const EquiposPage = () => {
     setEquipoEditando(equipo);
     setFormData({
       ...equipo,
-      categoria_id: equipo.categoria_id || '1'
+      categoria_id: equipo.categoria_id || '1',
+      ubicacion_id: equipo.ubicacion_id || ''
     });
     setMostrarFormulario(true);
   };
@@ -300,6 +333,7 @@ const EquiposPage = () => {
               <th>Código</th>
               <th>Nombre</th>
               <th>Sector</th>
+              <th>Ubicación</th>
               <th>Marca</th>
               <th>Modelo</th>
               <th>Estado</th>
@@ -308,22 +342,23 @@ const EquiposPage = () => {
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan="7" className="text-center">Cargando...</td></tr>
+              <tr><td colSpan="8" className="text-center">Cargando...</td></tr>
             ) : equiposFiltrados.length === 0 ? (
-              <tr><td colSpan="7" className="text-center">No hay equipos registrados</td></tr>
+              <tr><td colSpan="8" className="text-center">No hay equipos registrados</td></tr>
             ) : (
               equiposFiltrados.map(equipo => (
                 <tr key={equipo.id}>
                   <td><strong>{equipo.codigo_equipo}</strong></td>
                   <td>{equipo.nombre}</td>
                   <td>{equipo.sector?.nombre || 'N/A'}</td>
+                  <td>{equipo.ubicacion?.nombre || equipo.ubicacion?.codigo || 'N/A'}</td>
                   <td>{equipo.marca || '-'}</td>
                   <td>{equipo.modelo || '-'}</td>
                   <td>
                     <span className={`estado-badge estado-${equipo.estado}`}>
                       {equipo.estado?.replace('_', ' ')}
                     </span>
-                  </td>
+                   </td>
                   <td>
                     <button className="btn-icon" onClick={() => handleEditar(equipo)}>
                       <FiEdit2 />
@@ -331,7 +366,7 @@ const EquiposPage = () => {
                     <button className="btn-icon danger" onClick={() => handleEliminar(equipo.id)}>
                       <FiTrash2 />
                     </button>
-                  </td>
+                   </td>
                 </tr>
               ))
             )}
@@ -391,6 +426,22 @@ const EquiposPage = () => {
                     <option value="">Seleccione...</option>
                     {sectores.map(s => (
                       <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Ubicación</label>
+                  <select
+                    value={formData.ubicacion_id}
+                    onChange={(e) => setFormData({...formData, ubicacion_id: e.target.value})}
+                    disabled={!formData.sector_id}
+                  >
+                    <option value="">
+                      {!formData.sector_id ? 'Primero seleccione un sector' : 'Seleccione ubicación'}
+                    </option>
+                    {ubicacionesFiltradas.map(u => (
+                      <option key={u.id} value={u.id}>{u.codigo} - {u.nombre}</option>
                     ))}
                   </select>
                 </div>

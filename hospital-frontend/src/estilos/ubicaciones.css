@@ -1,0 +1,11 @@
+/* src/estilos/ubicaciones.css */
+@import './equipos.css';
+
+.ubicaciones-page {
+  padding: 20px;
+}
+
+.estado-critico {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+}

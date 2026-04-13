@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\SectorController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PingController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\UbicacionController;
 
 // Rutas públicas
 Route::get('/ping', [PingController::class, 'ping']);
@@ -32,8 +33,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mis-solicitudes', [SolicitudController::class, 'misSolicitudes']);
     
     // Ver detalle de una solicitud propia
-    Route::get('/solicitudes/{id}', [SolicitudController::class, 'show'])
-        ->middleware('can:ver,solicitud');
+    Route::get('/solicitudes/{id}', [SolicitudController::class, 'show']);
+        //->middleware('can:ver,solicitud');
     
     // Firmar solicitud - Según el rol que corresponda
     Route::post('/solicitudes/{id}/firmar', [SolicitudController::class, 'firmar']);
@@ -116,5 +117,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Cambiar contraseña de usuario
     Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
-    
+    // CRUD de Ubicaciones
+    Route::apiResource('ubicaciones', UbicacionController::class);
+
+    // Ubicaciones por sector
+    Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
 });

@@ -22,7 +22,8 @@ class Equipo extends Model
         'modelo', 
         'numero_serie', 
         'estado',
-        'fecha_adquisicion'
+        'fecha_adquisicion',
+        'ubicacion_id'
     ];
 
     protected $casts = [
@@ -44,5 +45,9 @@ class Equipo extends Model
     public function solicitudes()
     {
         return $this->hasMany(Solicitud::class, 'equipo_id');
+    }
+    public function ubicacion()
+    {
+        return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
     }
 }

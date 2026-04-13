@@ -1,0 +1,6 @@
+/* src/estilos/sectores.css */
+@import './equipos.css';
+
+.sectores-page {
+  padding: 20px;
+}

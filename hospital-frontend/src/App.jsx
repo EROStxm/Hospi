@@ -10,6 +10,10 @@ import Layout from './componentes/comunes/Layout.jsx';
 import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
 import TodasSolicitudesPage from './paginas/TodasSolicitudesPage';
 import UsuariosPage from './paginas/UsuariosPage';
+import MaterialesPage from './paginas/MaterialesPage';
+import DetalleSolicitudPage from './paginas/DetalleSolicitudPage';
+import UbicacionesPage from './paginas/UbicacionesPage';
+import SectoresPage from './paginas/SectoresPage.jsx';
 import EquiposPage from './paginas/EquiposPage';
 
 // ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
@@ -167,6 +171,55 @@ function AppContent() {
           autenticado ? (
             <ProtectedLayout>
               <UsuariosPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/materiales" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <MaterialesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/solicitudes/:id" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <DetalleSolicitudPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/ubicaciones" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <UbicacionesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      
+      <Route 
+        path="/sectores" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <SectoresPage />
             </ProtectedLayout>
           ) : (
             <Navigate to="/login" replace />

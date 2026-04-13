@@ -259,10 +259,47 @@ class SolicitudController extends Controller
     /**
      * Ver detalle de solicitud
      */
-    public function show($id)
+    // En app/Http/Controllers/Api/SolicitudController.php
+
+    public function show($id, Request $request)
     {
-        $solicitud = Solicitud::with(['solicitante', 'sector', 'equipo', 'tecnicoAsignado'])
-                    ->findOrFail($id);
+        $user = $request->user();
+        $solicitud = Solicitud::with(['solicitante', 'sector', 'equipo', 'tecnicoAsignado', 'materiales'])
+                        ->find($id);
+        
+        if (!$solicitud) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solicitud no encontrada'
+            ], 404);
+        }
+        
+        // PERMISOS SIMPLIFICADOS
+        $puedeVer = false;
+        
+        // Admin ve todo
+        if ($user->rol->nombre === 'admin_sistema') {
+            $puedeVer = true;
+        }
+        // Jefe de soporte y técnicos ven todo
+        elseif (in_array($user->rol->nombre, ['jefe_soporte', 'soporte_tecnico'])) {
+            $puedeVer = true;
+        }
+        // Jefe de servicio ve las de su sector
+        elseif ($user->rol->nombre === 'jefe_servicio' && $solicitud->sector_id === $user->sector_id) {
+            $puedeVer = true;
+        }
+        // Usuario ve sus propias solicitudes
+        elseif ($solicitud->solicitante_id === $user->id) {
+            $puedeVer = true;
+        }
+        
+        if (!$puedeVer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tiene permisos para ver esta solicitud'
+            ], 403);
+        }
 
         return response()->json([
             'success' => true,

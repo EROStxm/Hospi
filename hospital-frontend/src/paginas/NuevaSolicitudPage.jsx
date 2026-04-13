@@ -1,7 +1,8 @@
-// src/paginas/NuevaSolicitudPage.jsx - VERSIÓN FINAL
+// src/paginas/NuevaSolicitudPage.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { solicitudService } from '../servicios/solicitudService';
+import { ubicacionService } from '../servicios/ubicacionService';
 import toast from 'react-hot-toast';
 import { FiSave, FiX } from 'react-icons/fi';
 import '../estilos/nueva-solicitud.css';
@@ -11,13 +12,16 @@ const NuevaSolicitudPage = () => {
   const [cargando, setCargando] = useState(false);
   const [sectores, setSectores] = useState([]);
   const [equipos, setEquipos] = useState([]);
+  const [ubicaciones, setUbicaciones] = useState([]);
   const [equiposFiltrados, setEquiposFiltrados] = useState([]);
+  const [ubicacionesFiltradas, setUbicacionesFiltradas] = useState([]);
   
   const [formData, setFormData] = useState({
     tipo_solicitud: 'sin_material',
     titulo: '',
     descripcion: '',
     sector_id: '',
+    ubicacion_id: '',
     equipo_id: '',
   });
 
@@ -26,6 +30,7 @@ const NuevaSolicitudPage = () => {
   useEffect(() => {
     cargarSectores();
     cargarEquipos();
+    cargarUbicaciones();
   }, []);
 
   useEffect(() => {
@@ -36,6 +41,15 @@ const NuevaSolicitudPage = () => {
       setEquiposFiltrados([]);
     }
   }, [formData.sector_id, equipos]);
+
+  useEffect(() => {
+    if (formData.sector_id && Array.isArray(ubicaciones)) {
+      const filtradas = ubicaciones.filter(u => u.sector_id == formData.sector_id);
+      setUbicacionesFiltradas(filtradas);
+    } else {
+      setUbicacionesFiltradas([]);
+    }
+  }, [formData.sector_id, ubicaciones]);
 
   const cargarSectores = async () => {
     try {
@@ -82,6 +96,19 @@ const NuevaSolicitudPage = () => {
     } catch (error) {
       console.error('Error cargando equipos:', error);
       setEquipos([]);
+    }
+  };
+
+  const cargarUbicaciones = async () => {
+    try {
+      const response = await ubicacionService.obtenerTodos();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setUbicaciones(Array.isArray(datos) ? datos : []);
+      }
+    } catch (error) {
+      console.error('Error cargando ubicaciones:', error);
+      setUbicaciones([]);
     }
   };
 
@@ -204,6 +231,28 @@ const NuevaSolicitudPage = () => {
             ))}
           </select>
           {errores.sector_id && <span className="error-text">{errores.sector_id}</span>}
+        </div>
+
+        {/* Ubicación específica (NUEVO) */}
+        <div className="form-group">
+          <label className="form-label">Ubicación específica</label>
+          <select
+            name="ubicacion_id"
+            value={formData.ubicacion_id}
+            onChange={handleChange}
+            className="form-select"
+            disabled={!formData.sector_id}
+          >
+            <option value="">
+              {!formData.sector_id ? 'Primero seleccione un sector' : 'Seleccione ubicación (opcional)'}
+            </option>
+            {Array.isArray(ubicacionesFiltradas) && ubicacionesFiltradas.map(ubicacion => (
+              <option key={ubicacion.id} value={ubicacion.id}>
+                {ubicacion.codigo} - {ubicacion.nombre}
+              </option>
+            ))}
+          </select>
+          <small className="form-hint">Ayuda a localizar el equipo más rápido</small>
         </div>
 
         {/* Equipo */}

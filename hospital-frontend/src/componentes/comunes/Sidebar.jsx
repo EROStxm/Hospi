@@ -38,12 +38,15 @@ const Sidebar = ({ usuario, isOpen, onClose }) => {
     }
     
     // Admin
+    // En getMenuByRole(), agregar para admin:
     if (rol === 'admin_sistema') {
       items.push({ path: '/solicitudes', icon: '📋', label: 'Todas Solicitudes' });
       items.push({ path: '/roles', icon: '👥', label: 'Roles' });
       items.push({ path: '/usuarios', icon: '👤', label: 'Usuarios' });
       items.push({ path: '/equipos', icon: '🔧', label: 'Equipos' });
       items.push({ path: '/materiales', icon: '📦', label: 'Materiales' });
+      items.push({ path: '/sectores', icon: '🏥', label: 'Sectores' });
+      items.push({ path: '/ubicaciones', icon: '📍', label: 'Ubicaciones' }); // NUEVO
     }
     
     return items;

@@ -41,4 +41,8 @@ class Sector extends Model
     {
         return $this->hasMany(Solicitud::class, 'sector_id');
     }
+    public function ubicaciones()
+    {
+        return $this->hasMany(Ubicacion::class, 'sector_id');
+    }
 }
