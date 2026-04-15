@@ -2,10 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { solicitudService } from '../servicios/solicitudService';
+import { sectorService } from '../servicios/sectorService';
+import { equipoService } from '../servicios/equipoService';
 import { ubicacionService } from '../servicios/ubicacionService';
 import toast from 'react-hot-toast';
-import { FiSave, FiX } from 'react-icons/fi';
+import { FiSave, FiX, FiCamera, FiCheckCircle } from 'react-icons/fi';
 import '../estilos/nueva-solicitud.css';
+import SubirImagenes from '../componentes/comunes/SubirImagenes';
 
 const NuevaSolicitudPage = () => {
   const navigate = useNavigate();
@@ -15,6 +18,9 @@ const NuevaSolicitudPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [equiposFiltrados, setEquiposFiltrados] = useState([]);
   const [ubicacionesFiltradas, setUbicacionesFiltradas] = useState([]);
+  
+  const [solicitudCreadaId, setSolicitudCreadaId] = useState(null);
+  const [imagenesSubidas, setImagenesSubidas] = useState(false);
   
   const [formData, setFormData] = useState({
     tipo_solicitud: 'sin_material',
@@ -51,23 +57,26 @@ const NuevaSolicitudPage = () => {
     }
   }, [formData.sector_id, ubicaciones]);
 
+  // =============================================
+  // FUNCIONES CORREGIDAS PARA CARGAR DATOS
+  // =============================================
+  
   const cargarSectores = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/sectores', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const response = await sectorService.obtenerTodos();
+      console.log('📦 Sectores response:', response);
       
-      if (data.success && Array.isArray(data.data)) {
-        setSectores(data.data);
-      } else if (Array.isArray(data)) {
-        setSectores(data);
-      } else {
-        setSectores([]);
+      if (response.success) {
+        // Manejar diferentes formatos de respuesta
+        let datos = [];
+        if (response.data?.data) {
+          datos = response.data.data; // Paginated
+        } else if (response.data) {
+          datos = response.data;
+        } else {
+          datos = response;
+        }
+        setSectores(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
       console.error('Error cargando sectores:', error);
@@ -77,21 +86,19 @@ const NuevaSolicitudPage = () => {
 
   const cargarEquipos = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/equipos', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const response = await equipoService.obtenerTodos();
+      console.log('📦 Equipos response:', response);
       
-      if (data.success && Array.isArray(data.data)) {
-        setEquipos(data.data);
-      } else if (Array.isArray(data)) {
-        setEquipos(data);
-      } else {
-        setEquipos([]);
+      if (response.success) {
+        let datos = [];
+        if (response.data?.data) {
+          datos = response.data.data;
+        } else if (response.data) {
+          datos = response.data;
+        } else {
+          datos = response;
+        }
+        setEquipos(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
       console.error('Error cargando equipos:', error);
@@ -102,8 +109,17 @@ const NuevaSolicitudPage = () => {
   const cargarUbicaciones = async () => {
     try {
       const response = await ubicacionService.obtenerTodos();
+      console.log('📦 Ubicaciones response:', response);
+      
       if (response.success) {
-        const datos = response.data?.data || response.data || response;
+        let datos = [];
+        if (response.data?.data) {
+          datos = response.data.data;
+        } else if (response.data) {
+          datos = response.data;
+        } else {
+          datos = response;
+        }
         setUbicaciones(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
@@ -111,6 +127,10 @@ const NuevaSolicitudPage = () => {
       setUbicaciones([]);
     }
   };
+
+  // =============================================
+  // RESTO DEL CÓDIGO IGUAL
+  // =============================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -161,8 +181,8 @@ const NuevaSolicitudPage = () => {
       const response = await solicitudService.crear(formData);
       
       if (response.success) {
-        toast.success('¡Solicitud creada correctamente!');
-        navigate('/mis-solicitudes');
+        setSolicitudCreadaId(response.data.id);
+        toast.success('¡Solicitud creada! Ahora puedes agregar fotos');
       }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
@@ -172,6 +192,63 @@ const NuevaSolicitudPage = () => {
     }
   };
 
+  const handleFinalizar = () => {
+    if (imagenesSubidas) {
+      toast.success('¡Solicitud completada con fotos!');
+    }
+    navigate('/mis-solicitudes');
+  };
+
+  // Si ya se creó la solicitud, mostrar sección de fotos
+  if (solicitudCreadaId) {
+    return (
+      <div className="nueva-solicitud-page">
+        <div className="page-header">
+          <div className="header-content">
+            <h1>📸 Agregar Evidencia</h1>
+            <p className="subtitle">Puedes agregar fotos para ayudar a identificar el problema</p>
+          </div>
+        </div>
+
+        <div className="upload-section">
+          <div className="success-badge">
+            <FiCheckCircle className="success-icon" />
+            <span>Solicitud #{solicitudCreadaId} creada exitosamente</span>
+          </div>
+
+          <div className="upload-container">
+            <h3>
+              <FiCamera /> Fotos de la solicitud (opcional)
+            </h3>
+            <SubirImagenes 
+              solicitudId={solicitudCreadaId}
+              onImagenesSubidas={() => {
+                setImagenesSubidas(true);
+                toast.success('¡Fotos agregadas correctamente!');
+              }}
+            />
+          </div>
+
+          <div className="form-actions">
+            <button 
+              className="btn-primary"
+              onClick={handleFinalizar}
+            >
+              {imagenesSubidas ? '✅ Finalizar y ver solicitudes' : '⏭️ Omitir fotos y finalizar'}
+            </button>
+            <button 
+              className="btn-secondary"
+              onClick={() => navigate(`/solicitudes/${solicitudCreadaId}`)}
+            >
+              👁️ Ver solicitud creada
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Formulario normal
   return (
     <div className="nueva-solicitud-page">
       <div className="page-header">
@@ -224,16 +301,18 @@ const NuevaSolicitudPage = () => {
             className={`form-select ${errores.sector_id ? 'error' : ''}`}
           >
             <option value="">Seleccione un sector</option>
-            {Array.isArray(sectores) && sectores.map(sector => (
-              <option key={sector.id} value={sector.id}>
-                {sector.nombre}
-              </option>
-            ))}
+            {sectores.length > 0 ? (
+              sectores.map(sector => (
+                <option key={sector.id} value={sector.id}>{sector.nombre}</option>
+              ))
+            ) : (
+              <option disabled>Cargando sectores...</option>
+            )}
           </select>
           {errores.sector_id && <span className="error-text">{errores.sector_id}</span>}
         </div>
 
-        {/* Ubicación específica (NUEVO) */}
+        {/* Ubicación específica */}
         <div className="form-group">
           <label className="form-label">Ubicación específica</label>
           <select
@@ -246,7 +325,7 @@ const NuevaSolicitudPage = () => {
             <option value="">
               {!formData.sector_id ? 'Primero seleccione un sector' : 'Seleccione ubicación (opcional)'}
             </option>
-            {Array.isArray(ubicacionesFiltradas) && ubicacionesFiltradas.map(ubicacion => (
+            {ubicacionesFiltradas.map(ubicacion => (
               <option key={ubicacion.id} value={ubicacion.id}>
                 {ubicacion.codigo} - {ubicacion.nombre}
               </option>
@@ -268,7 +347,7 @@ const NuevaSolicitudPage = () => {
             <option value="">
               {!formData.sector_id ? 'Primero seleccione un sector' : 'Seleccione un equipo'}
             </option>
-            {Array.isArray(equiposFiltrados) && equiposFiltrados.map(equipo => (
+            {equiposFiltrados.map(equipo => (
               <option key={equipo.id} value={equipo.id}>
                 {equipo.codigo_equipo} - {equipo.nombre}
               </option>

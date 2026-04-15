@@ -122,4 +122,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ubicaciones por sector
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
+
+    Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
+    
+    Route::post('/solicitudes/{id}/upload-imagenes', [SolicitudController::class, 'uploadImagenes']);
 });

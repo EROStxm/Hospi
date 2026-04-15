@@ -168,10 +168,20 @@ class SolicitudController extends Controller
      */
     public function pendientesSoporte(Request $request)
     {
-        $solicitudes = Solicitud::with(['solicitante', 'sector', 'equipo'])
-                    ->whereIn('estado', ['pendiente_soporte', 'asignado', 'en_proceso'])
-                    ->orderBy('creado_en', 'desc')
-                    ->get();
+        $query = Solicitud::with(['solicitante', 'sector', 'equipo', 'tecnicoAsignado'])
+                    ->whereIn('estado', ['pendiente_soporte', 'asignado', 'en_proceso']);
+        
+        $user = $request->user();
+        
+        // Si es técnico, solo ver las asignadas a él Y las pendientes de soporte
+        if ($user && $user->rol && $user->rol->nombre === 'soporte_tecnico') {
+            $query->where(function($q) use ($user) {
+                $q->where('tecnico_asignado_id', $user->id)
+                ->orWhere('estado', 'pendiente_soporte');
+            });
+        }
+        
+        $solicitudes = $query->orderBy('creado_en', 'desc')->get();
         
         return response()->json([
             'success' => true,
@@ -227,6 +237,7 @@ class SolicitudController extends Controller
     /**
      * Crear nueva solicitud
      */
+    
     public function store(Request $request)
     {
         $request->validate([
@@ -315,15 +326,86 @@ class SolicitudController extends Controller
         $solicitud = Solicitud::findOrFail($id);
         $user = $request->user();
         
-        // Lógica simplificada - solo para que funcione
-        if ($solicitud->estado === 'pendiente_solicitante') {
-            $solicitud->update([
-                'solicitante_firmo_en' => now(),
-                'estado' => $solicitud->tipo_solicitud === 'con_material' 
-                    ? 'pendiente_jefe_seccion' 
-                    : 'pendiente_soporte'
-            ]);
+        switch ($solicitud->estado) {
+            case 'pendiente_solicitante':
+                // Solo el solicitante puede firmar
+                if ($solicitud->solicitante_id !== $user->id) {
+                    return response()->json(['message' => 'Solo el solicitante puede firmar'], 403);
+                }
+                
+                $solicitud->update([
+                    'solicitante_firmo_en' => now(),
+                    'solicitante_ip' => $request->ip(),
+                    'solicitante_dispositivo' => $request->header('User-Agent'),
+                    'estado' => $solicitud->tipo_solicitud === 'con_material' 
+                        ? 'pendiente_jefe_seccion' 
+                        : 'pendiente_soporte'
+                ]);
+                break;
+
+            case 'pendiente_jefe_seccion':
+                // Solo jefe de servicio del mismo sector
+                if (!$user->rol->puede_aprobar_material || $solicitud->sector_id !== $user->sector_id) {
+                    return response()->json(['message' => 'No autorizado para firmar. Debe ser Jefe de Servicio del sector'], 403);
+                }
+                
+                $solicitud->update([
+                    'jefe_seccion_firmo_en' => now(),
+                    'jefe_seccion_id' => $user->id,
+                    'jefe_seccion_ip' => $request->ip(),
+                    'estado' => 'pendiente_jefe_activos'
+                ]);
+                break;
+
+            case 'pendiente_jefe_activos':
+                // Solo jefe de soporte o admin
+                if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
+                    return response()->json(['message' => 'No autorizado. Debe ser Jefe de Soporte o Admin'], 403);
+                }
+                
+                $solicitud->update([
+                    'jefe_activos_firmo_en' => now(),
+                    'jefe_activos_id' => $user->id,
+                    'jefe_activos_ip' => $request->ip(),
+                    'estado' => 'pendiente_soporte'
+                ]);
+                break;
+
+            case 'pendiente_conformacion':
+                // Solo el solicitante puede dar conformidad
+                if ($solicitud->solicitante_id !== $user->id) {
+                    return response()->json(['message' => 'Solo el solicitante puede dar conformidad'], 403);
+                }
+                
+                $solicitud->update([
+                    'conformacion_firmo_en' => now(),
+                    'conformacion_id' => $user->id,
+                    'conformacion_ip' => $request->ip(),
+                    'conformacion_comentario' => $request->comentario ?? 'Trabajo conforme',
+                    'estado' => 'pendiente_jefe_mantenimiento'
+                ]);
+                break;
+
+            case 'pendiente_jefe_mantenimiento':
+                // Solo jefe de soporte o admin
+                if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
+                    return response()->json(['message' => 'No autorizado. Debe ser Jefe de Soporte o Admin'], 403);
+                }
+                
+                $solicitud->update([
+                    'jefe_mantenimiento_firmo_en' => now(),
+                    'jefe_mantenimiento_id' => $user->id,
+                    'jefe_mantenimiento_ip' => $request->ip(),
+                    'estado' => 'completado'
+                ]);
+                break;
+
+            default:
+                return response()->json(['message' => 'No se puede firmar en el estado: ' . $solicitud->estado], 400);
         }
+
+        // Recargar con relaciones
+        $solicitud->load(['solicitante', 'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion']);
 
         return response()->json([
             'success' => true,
@@ -392,4 +474,97 @@ class SolicitudController extends Controller
             'message' => 'Material registrado correctamente'
         ]);
     }
+    /**
+     * Obtener estadísticas para el Dashboard
+     */
+    public function estadisticas(Request $request)
+    {
+        $user = $request->user();
+        
+        // Base query según rol
+        $query = Solicitud::query();
+        
+        // Si no es admin ni soporte, solo ve sus solicitudes o las de su sector
+        if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte', 'soporte_tecnico'])) {
+            if ($user->rol->nombre === 'jefe_servicio') {
+                $query->where('sector_id', $user->sector_id);
+            } else {
+                $query->where('solicitante_id', $user->id);
+            }
+        }
+        
+        $total = (clone $query)->count();
+        
+        $pendientes = (clone $query)->whereIn('estado', [
+            'pendiente_solicitante',
+            'pendiente_jefe_seccion', 
+            'pendiente_jefe_activos',
+            'pendiente_soporte'
+        ])->count();
+        
+        $enProceso = (clone $query)->whereIn('estado', [
+            'asignado',
+            'en_proceso',
+            'pendiente_conformacion',
+            'pendiente_jefe_mantenimiento'
+        ])->count();
+        
+        $completadas = (clone $query)->where('estado', 'completado')->count();
+        
+        // Últimas 5 solicitudes
+        $recientes = (clone $query)->with(['solicitante', 'equipo', 'sector'])
+            ->orderBy('creado_en', 'desc')
+            ->limit(5)
+            ->get();
+        
+        // Stock bajo de materiales (para admin/soporte)
+        $stockBajo = 0;
+        if (in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte'])) {
+            $stockBajo = Material::where('esta_activo', true)
+                ->whereRaw('stock <= stock_minimo')
+                ->count();
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total' => $total,
+                'pendientes' => $pendientes,
+                'en_proceso' => $enProceso,
+                'completadas' => $completadas,
+                'stock_bajo' => $stockBajo,
+                'recientes' => $recientes
+            ]
+        ]);
+    }
+
+    /**
+     * Subir imágenes para una solicitud
+     */
+    public function uploadImagenes(Request $request, $id)
+    {
+        $request->validate([
+            'imagenes' => 'required|array',
+            'imagenes.*' => 'image|mimes:jpeg,png,jpg|max:5120' // 5MB max
+        ]);
+
+        $solicitud = Solicitud::findOrFail($id);
+        
+        $rutas = $solicitud->rutas_fotos ?? [];
+        
+        foreach ($request->file('imagenes') as $imagen) {
+            $nombre = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
+            $ruta = $imagen->storeAs('solicitudes/' . $id, $nombre, 'public');
+            $rutas[] = '/storage/' . $ruta;
+        }
+        
+        $solicitud->update(['rutas_fotos' => $rutas]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => count($request->file('imagenes')) . ' imágenes subidas',
+            'data' => ['rutas_fotos' => $rutas]
+        ]);
+    }
+    
 }

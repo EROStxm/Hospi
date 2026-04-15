@@ -81,7 +81,29 @@ class User extends Authenticatable
     {
         return $this->rol ? (bool) $this->rol->puede_ver_todas_solicitudes : false;
     }
-    
+    // Verificar si el usuario es Jefe de Servicio
+    public function esJefeServicio()
+    {
+        return $this->rol && $this->rol->nombre === 'jefe_servicio';
+    }
+
+    // Verificar si el usuario es Jefe de Soporte
+    public function esJefeSoporte()
+    {
+        return $this->rol && $this->rol->nombre === 'jefe_soporte';
+    }
+
+    // Verificar si el usuario es Admin
+    public function esAdmin()
+    {
+        return $this->rol && $this->rol->nombre === 'admin_sistema';
+    }
+
+    // Verificar si el usuario es Técnico
+    public function esTecnico()
+    {
+        return $this->rol && $this->rol->nombre === 'soporte_tecnico';
+    }
     // Accesor para obtener el nombre del rol
     public function getRolNombreAttribute()
     {

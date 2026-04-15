@@ -14,6 +14,8 @@ import MaterialesPage from './paginas/MaterialesPage';
 import DetalleSolicitudPage from './paginas/DetalleSolicitudPage';
 import UbicacionesPage from './paginas/UbicacionesPage';
 import SectoresPage from './paginas/SectoresPage.jsx';
+import MisTrabajosPage from './paginas/MisTrabajosPage';
+import SolicitudesPendientesPage from './paginas/SolicitudesPendientesPage';
 import EquiposPage from './paginas/EquiposPage';
 
 // ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
@@ -226,6 +228,13 @@ function AppContent() {
           )
         } 
       />
+      <Route path="mis-asignaciones" element={
+      autenticado ? <ProtectedLayout><MisTrabajosPage /></ProtectedLayout> : <Navigate to="/login" replace />
+    } />
+
+    <Route path="/solicitudes-pendientes" element={
+      autenticado ? <ProtectedLayout><SolicitudesPendientesPage /></ProtectedLayout> : <Navigate to="/login" replace />
+    } />
 
       <Route 
         path="/" 
