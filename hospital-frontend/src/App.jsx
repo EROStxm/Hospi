@@ -18,6 +18,9 @@ import MisTrabajosPage from './paginas/MisTrabajosPage';
 import SolicitudesPendientesPage from './paginas/SolicitudesPendientesPage';
 import EquiposPage from './paginas/EquiposPage';
 
+import ParaFirmarPage from './paginas/ParaFirmarPage';
+import SolicitudesSectorPage from './paginas/SolicitudesSectorPage';
+
 // ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
 import './estilos/global.css';
 
@@ -229,12 +232,21 @@ function AppContent() {
         } 
       />
       <Route path="mis-asignaciones" element={
-      autenticado ? <ProtectedLayout><MisTrabajosPage /></ProtectedLayout> : <Navigate to="/login" replace />
-    } />
+        autenticado ? <ProtectedLayout><MisTrabajosPage /></ProtectedLayout> : <Navigate to="/login" replace />
+      } />
 
-    <Route path="/solicitudes-pendientes" element={
-      autenticado ? <ProtectedLayout><SolicitudesPendientesPage /></ProtectedLayout> : <Navigate to="/login" replace />
-    } />
+      <Route path="/solicitudes-pendientes" element={
+        autenticado ? <ProtectedLayout><SolicitudesPendientesPage /></ProtectedLayout> : <Navigate to="/login" replace />
+      } />
+          
+      // Dentro de Routes:
+      <Route path="/para-firmar" element={
+        autenticado ? <ProtectedLayout><ParaFirmarPage /></ProtectedLayout> : <Navigate to="/login" replace />
+      } />
+
+      <Route path="/solicitudes-sector" element={
+        autenticado ? <ProtectedLayout><SolicitudesSectorPage /></ProtectedLayout> : <Navigate to="/login" replace />
+      } />
 
       <Route 
         path="/" 

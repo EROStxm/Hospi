@@ -1,0 +1,80 @@
+.para-firmar-page {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.resumen-card {
+  display: flex;
+  gap: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+  border-radius: 12px;
+  margin-bottom: 25px;
+  border: 1px solid #fbbf24;
+}
+
+.resumen-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.resumen-item .icon-warning {
+  font-size: 32px;
+  color: #d97706;
+}
+
+.resumen-item .icon-info {
+  font-size: 24px;
+  color: #3b82f6;
+}
+
+.resumen-numero {
+  font-size: 36px;
+  font-weight: bold;
+  color: #d97706;
+  display: block;
+  line-height: 1.2;
+}
+
+.resumen-label {
+  color: #92400e;
+  font-size: 14px;
+}
+
+.tiempo-espera {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 10px;
+}
+
+.firmado-info {
+  color: #10b981;
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.btn-firmar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-firmar:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
