@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiFilter } from 'react-icons/fi';
+import { equipoService } from '../servicios/equipoService';
+import { sectorService } from '../servicios/sectorService';
+import { ubicacionService } from '../servicios/ubicacionService';
 import '../estilos/equipos.css';
 
 const EquiposPage = () => {
@@ -51,67 +54,76 @@ const EquiposPage = () => {
   }, [formData.sector_id, ubicaciones]);
 
   useEffect(() => {
-    cargarEquipos();
-    cargarSectores();
-    cargarUbicaciones();
+    cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
     filtrarEquipos();
   }, [equipos, search, sectorFiltro, estadoFiltro, marcaFiltro]);
 
-  const cargarEquipos = async () => {
+  const cargarDatosIniciales = async () => {
     try {
       setCargando(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/equipos', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
-        setEquipos(Array.isArray(datos) ? datos : []);
-      }
+      await Promise.all([
+        cargarEquipos(),
+        cargarSectores(),
+        cargarUbicaciones()
+      ]);
     } catch (error) {
-      console.error('Error cargando equipos:', error);
-      toast.error('Error al cargar equipos');
+      console.error('Error cargando datos:', error);
+      toast.error('Error al cargar los datos');
     } finally {
       setCargando(false);
     }
   };
 
+  const cargarEquipos = async () => {
+    try {
+      const response = await equipoService.obtenerTodos();
+      console.log('Equipos response:', response);
+      
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setEquipos(Array.isArray(datos) ? datos : []);
+      } else {
+        setEquipos([]);
+      }
+    } catch (error) {
+      console.error('Error cargando equipos:', error);
+      toast.error(error.message || 'Error al cargar equipos');
+      setEquipos([]);
+    }
+  };
+
   const cargarSectores = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/sectores', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const response = await sectorService.obtenerTodos();
       
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
         setSectores(Array.isArray(datos) ? datos : []);
+      } else {
+        setSectores([]);
       }
     } catch (error) {
       console.error('Error cargando sectores:', error);
+      setSectores([]);
     }
   };
 
   const cargarUbicaciones = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/ubicaciones', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const response = await ubicacionService.obtenerTodos();
       
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
         setUbicaciones(Array.isArray(datos) ? datos : []);
+      } else {
+        setUbicaciones([]);
       }
     } catch (error) {
       console.error('Error cargando ubicaciones:', error);
+      setUbicaciones([]);
     }
   };
 
@@ -146,68 +158,93 @@ const EquiposPage = () => {
     setEquiposFiltrados(filtrados);
   };
 
+  const validarFormulario = () => {
+    if (!formData.codigo_equipo?.trim()) {
+      toast.error('El código del equipo es requerido');
+      return false;
+    }
+    if (!formData.nombre?.trim()) {
+      toast.error('El nombre del equipo es requerido');
+      return false;
+    }
+    if (!formData.sector_id) {
+      toast.error('Debe seleccionar un sector');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (!validarFormulario()) return;
+    
     try {
-      const token = localStorage.getItem('token');
-      const url = equipoEditando 
-        ? `http://localhost:8000/api/equipos/${equipoEditando.id}`
-        : 'http://localhost:8000/api/equipos';
+      let response;
+      if (equipoEditando) {
+        response = await equipoService.actualizar(equipoEditando.id, formData);
+      } else {
+        response = await equipoService.crear(formData);
+      }
       
-      const method = equipoEditando ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success(equipoEditando ? 'Equipo actualizado' : 'Equipo creado');
-        setMostrarFormulario(false);
-        setEquipoEditando(null);
-        setFormData({
-          codigo_equipo: '', nombre: '', descripcion: '', categoria_id: '1',
-          sector_id: '', ubicacion_id: '', marca: '', modelo: '', numero_serie: '', estado: 'operativo'
-        });
-        cargarEquipos();
+      if (response.success) {
+        toast.success(equipoEditando ? 'Equipo actualizado exitosamente' : 'Equipo creado exitosamente');
+        cerrarFormulario();
+        await cargarEquipos();
+      } else {
+        toast.error(response.message || 'Error al guardar el equipo');
       }
     } catch (error) {
-      toast.error('Error al guardar el equipo');
+      console.error('Error guardando equipo:', error);
+      toast.error(error.message || 'Error al guardar el equipo');
     }
   };
 
   const handleEditar = (equipo) => {
     setEquipoEditando(equipo);
     setFormData({
-      ...equipo,
+      codigo_equipo: equipo.codigo_equipo || '',
+      nombre: equipo.nombre || '',
+      descripcion: equipo.descripcion || '',
       categoria_id: equipo.categoria_id || '1',
-      ubicacion_id: equipo.ubicacion_id || ''
+      sector_id: equipo.sector_id || '',
+      ubicacion_id: equipo.ubicacion_id || '',
+      marca: equipo.marca || '',
+      modelo: equipo.modelo || '',
+      numero_serie: equipo.numero_serie || '',
+      estado: equipo.estado || 'operativo'
     });
     setMostrarFormulario(true);
   };
 
   const handleEliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este equipo?')) return;
+    if (!window.confirm('¿Está seguro de eliminar este equipo? Esta acción no se puede deshacer.')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/equipos/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      toast.success('Equipo eliminado');
-      cargarEquipos();
+      await equipoService.eliminar(id);
+      toast.success('Equipo eliminado exitosamente');
+      await cargarEquipos();
     } catch (error) {
-      toast.error('Error al eliminar');
+      console.error('Error eliminando equipo:', error);
+      toast.error(error.message || 'Error al eliminar el equipo');
     }
+  };
+
+  const cerrarFormulario = () => {
+    setMostrarFormulario(false);
+    setEquipoEditando(null);
+    setFormData({
+      codigo_equipo: '',
+      nombre: '',
+      descripcion: '',
+      categoria_id: '1',
+      sector_id: '',
+      ubicacion_id: '',
+      marca: '',
+      modelo: '',
+      numero_serie: '',
+      estado: 'operativo'
+    });
   };
 
   const handleLimpiarFiltros = () => {
@@ -342,9 +379,13 @@ const EquiposPage = () => {
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan="8" className="text-center">Cargando...</td></tr>
+              <tr><td colSpan="8" className="text-center">
+                <div className="spinner"></div>
+                Cargando...
+              </td></tr>
             ) : equiposFiltrados.length === 0 ? (
-              <tr><td colSpan="8" className="text-center">No hay equipos registrados</td></tr>
+              <tr><td colSpan="8" className="text-center">No hay equipos registrados</td>
+              </tr>
             ) : (
               equiposFiltrados.map(equipo => (
                 <tr key={equipo.id}>
@@ -358,15 +399,15 @@ const EquiposPage = () => {
                     <span className={`estado-badge estado-${equipo.estado}`}>
                       {equipo.estado?.replace('_', ' ')}
                     </span>
-                   </td>
+                  </td>
                   <td>
-                    <button className="btn-icon" onClick={() => handleEditar(equipo)}>
+                    <button className="btn-icon" onClick={() => handleEditar(equipo)} title="Editar">
                       <FiEdit2 />
                     </button>
-                    <button className="btn-icon danger" onClick={() => handleEliminar(equipo.id)}>
+                    <button className="btn-icon danger" onClick={() => handleEliminar(equipo.id)} title="Eliminar">
                       <FiTrash2 />
                     </button>
-                   </td>
+                  </td>
                 </tr>
               ))
             )}
@@ -380,7 +421,7 @@ const EquiposPage = () => {
           <div className="modal">
             <div className="modal-header">
               <h2>{equipoEditando ? 'Editar Equipo' : 'Nuevo Equipo'}</h2>
-              <button onClick={() => { setMostrarFormulario(false); setEquipoEditando(null); }}>
+              <button onClick={cerrarFormulario}>
                 <FiX />
               </button>
             </div>
@@ -394,6 +435,7 @@ const EquiposPage = () => {
                     value={formData.codigo_equipo}
                     onChange={(e) => setFormData({...formData, codigo_equipo: e.target.value})}
                     required
+                    placeholder="Ej: EQ-001"
                   />
                 </div>
                 
@@ -404,6 +446,7 @@ const EquiposPage = () => {
                     value={formData.nombre}
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                     required
+                    placeholder="Ej: Ventilador Pulmonar"
                   />
                 </div>
                 
@@ -413,6 +456,7 @@ const EquiposPage = () => {
                     value={formData.descripcion}
                     onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
                     rows="3"
+                    placeholder="Descripción detallada del equipo"
                   />
                 </div>
                 
@@ -466,6 +510,7 @@ const EquiposPage = () => {
                     type="text"
                     value={formData.marca}
                     onChange={(e) => setFormData({...formData, marca: e.target.value})}
+                    placeholder="Ej: Philips, GE, Siemens"
                   />
                 </div>
                 
@@ -475,6 +520,7 @@ const EquiposPage = () => {
                     type="text"
                     value={formData.modelo}
                     onChange={(e) => setFormData({...formData, modelo: e.target.value})}
+                    placeholder="Ej: XR-2020"
                   />
                 </div>
                 
@@ -484,12 +530,13 @@ const EquiposPage = () => {
                     type="text"
                     value={formData.numero_serie}
                     onChange={(e) => setFormData({...formData, numero_serie: e.target.value})}
+                    placeholder="Número de serie único"
                   />
                 </div>
               </div>
               
               <div className="modal-actions">
-                <button type="button" onClick={() => { setMostrarFormulario(false); setEquipoEditando(null); }}>
+                <button type="button" onClick={cerrarFormulario}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary">

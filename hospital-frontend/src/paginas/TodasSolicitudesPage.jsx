@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { solicitudService } from '../servicios/solicitudService';
+import { sectorService } from '../servicios/sectorService';
+import { equipoService } from '../servicios/equipoService';
 import toast from 'react-hot-toast';
 import { FiSearch, FiFilter, FiEye, FiCheckCircle, FiClock, FiAlertCircle, FiTool, FiChevronLeft, FiChevronRight, FiX } from 'react-icons/fi';
 import '../estilos/todas-solicitudes.css';
@@ -77,32 +79,32 @@ const TodasSolicitudesPage = () => {
   };
 
   useEffect(() => {
-    cargarSectores();
-    cargarEquipos();
+    cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
     cargarSolicitudes();
   }, [paginaActual, estadoFiltro, sectorFiltro, equipoFiltro, mesFiltro, anioFiltro]);
 
+  const cargarDatosIniciales = async () => {
+    try {
+      await Promise.all([
+        cargarSectores(),
+        cargarEquipos()
+      ]);
+    } catch (error) {
+      console.error('Error cargando datos iniciales:', error);
+    }
+  };
+
   const cargarSectores = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/sectores', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      const data = await response.json();
-      console.log('Sectores response:', data);
+      const response = await sectorService.obtenerTodos();
+      console.log('Sectores response:', response);
       
-      if (data.success && Array.isArray(data.data)) {
-        setSectores(data.data);
-      } else if (Array.isArray(data)) {
-        setSectores(data);
-      } else if (data.data && Array.isArray(data.data.data)) {
-        setSectores(data.data.data);
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setSectores(Array.isArray(datos) ? datos : []);
       } else {
         setSectores([]);
       }
@@ -114,22 +116,12 @@ const TodasSolicitudesPage = () => {
 
   const cargarEquipos = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/equipos', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      const data = await response.json();
-      console.log('Equipos response:', data);
+      const response = await equipoService.obtenerTodos();
+      console.log('Equipos response:', response);
       
-      if (data.success && Array.isArray(data.data)) {
-        setEquipos(data.data);
-      } else if (Array.isArray(data)) {
-        setEquipos(data);
-      } else if (data.data && Array.isArray(data.data.data)) {
-        setEquipos(data.data.data);
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setEquipos(Array.isArray(datos) ? datos : []);
       } else {
         setEquipos([]);
       }
@@ -170,10 +162,13 @@ const TodasSolicitudesPage = () => {
         setSolicitudes(Array.isArray(datos) ? datos : []);
         setTotalPaginas(response.data?.last_page || response.last_page || 1);
         setTotalRegistros(response.data?.total || response.total || datos.length);
+      } else {
+        setSolicitudes([]);
       }
     } catch (error) {
       console.error('Error cargando solicitudes:', error);
-      toast.error('Error al cargar las solicitudes');
+      toast.error(error.message || 'Error al cargar las solicitudes');
+      setSolicitudes([]);
     } finally {
       setCargando(false);
     }
@@ -385,7 +380,7 @@ const TodasSolicitudesPage = () => {
                 solicitudes.map((solicitud) => {
                   const estadoConfig = getEstadoConfig(solicitud.estado);
                   return (
-                    <tr key={solicitud.id} onClick={() => handleVerDetalle(solicitud.id)}>
+                    <tr key={solicitud.id} onClick={() => handleVerDetalle(solicitud.id)} style={{ cursor: 'pointer' }}>
                       <td className="solicitud-id">#{solicitud.id}</td>
                       <td className="solicitud-titulo">{solicitud.titulo}</td>
                       <td>{solicitud.solicitante?.nombre_completo || 'N/A'}</td>

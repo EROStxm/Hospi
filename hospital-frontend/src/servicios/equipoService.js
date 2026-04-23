@@ -1,5 +1,5 @@
 import api from './api';
-
+// src/servicios/equipoService.js
 export const equipoService = {
   // Obtener todos los equipos
   obtenerTodos: async (params = {}) => {
