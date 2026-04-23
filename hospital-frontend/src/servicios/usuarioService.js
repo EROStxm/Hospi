@@ -1,3 +1,4 @@
+// src/servicios/usuarioService.js
 import api from './api';
 
 export const usuarioService = {
@@ -58,6 +59,16 @@ export const usuarioService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Error al eliminar el usuario' };
+    }
+  },
+
+  // Cambiar estado del usuario
+  cambiarEstado: async (id, estado) => {
+    try {
+      const response = await api.put(`/usuarios/${id}`, { esta_activo: estado });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al cambiar estado' };
     }
   },
 

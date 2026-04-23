@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../utiles/constantes';
-
+// hospital-frontend/src/servicios/api.js
 // Crear instancia de axios
 const api = axios.create({
   baseURL: API_URL,

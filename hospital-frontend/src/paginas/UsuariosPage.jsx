@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiFilter, FiEye, FiEyeOff } from 'react-icons/fi';
+import { usuarioService } from '../servicios/usuarioService';
+import { catalogosService } from '../servicios/catalogosService';
 import '../estilos/usuarios.css';
 
 const UsuariosPage = () => {
@@ -42,67 +44,72 @@ const UsuariosPage = () => {
   ];
 
   useEffect(() => {
-    cargarUsuarios();
-    cargarRoles();
-    cargarSectores();
+    cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
     filtrarUsuarios();
   }, [usuarios, search, rolFiltro, sectorFiltro, estadoFiltro]);
 
-  const cargarUsuarios = async () => {
+  const cargarDatosIniciales = async () => {
     try {
       setCargando(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/usuarios', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
-        setUsuarios(Array.isArray(datos) ? datos : []);
-      }
+      await Promise.all([
+        cargarUsuarios(),
+        cargarRoles(),
+        cargarSectores()
+      ]);
     } catch (error) {
-      console.error('Error cargando usuarios:', error);
-      toast.error('Error al cargar usuarios');
+      console.error('Error cargando datos:', error);
+      toast.error('Error al cargar los datos');
     } finally {
       setCargando(false);
     }
   };
 
+  const cargarUsuarios = async () => {
+    try {
+      const response = await usuarioService.obtenerTodos();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setUsuarios(Array.isArray(datos) ? datos : []);
+      } else {
+        setUsuarios([]);
+      }
+    } catch (error) {
+      console.error('Error cargando usuarios:', error);
+      toast.error(error.message || 'Error al cargar usuarios');
+      setUsuarios([]);
+    }
+  };
+
   const cargarRoles = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/roles', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
+      const response = await catalogosService.obtenerRoles();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
         setRoles(Array.isArray(datos) ? datos : []);
+      } else {
+        setRoles([]);
       }
     } catch (error) {
       console.error('Error cargando roles:', error);
+      setRoles([]);
     }
   };
 
   const cargarSectores = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/sectores', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        const datos = data.data?.data || data.data || data;
+      const response = await catalogosService.obtenerSectores();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
         setSectores(Array.isArray(datos) ? datos : []);
+      } else {
+        setSectores([]);
       }
     } catch (error) {
       console.error('Error cargando sectores:', error);
+      setSectores([]);
     }
   };
 
@@ -165,44 +172,29 @@ const UsuariosPage = () => {
     }
     
     try {
-      const token = localStorage.getItem('token');
-      const url = usuarioEditando 
-        ? `http://localhost:8000/api/usuarios/${usuarioEditando.id}`
-        : 'http://localhost:8000/api/usuarios';
-      
-      const method = usuarioEditando ? 'PUT' : 'POST';
-      
       // Si es edición y no se cambió la contraseña, no enviarla
       const dataToSend = { ...formData };
       if (usuarioEditando && !dataToSend.contrasena) {
         delete dataToSend.contrasena;
       }
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dataToSend)
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success(usuarioEditando ? 'Usuario actualizado' : 'Usuario creado');
-        setMostrarFormulario(false);
-        setUsuarioEditando(null);
-        setFormData({
-          codigo_militar: '', nombre_completo: '', email: '', contrasena: '',
-          grado: '', especialidad: '', telefono: '', rol_id: '', sector_id: '', esta_activo: true
-        });
-        cargarUsuarios();
+      let response;
+      if (usuarioEditando) {
+        response = await usuarioService.actualizar(usuarioEditando.id, dataToSend);
       } else {
-        toast.error(data.message || 'Error al guardar');
+        response = await usuarioService.crear(dataToSend);
+      }
+      
+      if (response.success) {
+        toast.success(usuarioEditando ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
+        cerrarFormulario();
+        await cargarUsuarios();
+      } else {
+        toast.error(response.message || 'Error al guardar el usuario');
       }
     } catch (error) {
-      toast.error('Error al guardar el usuario');
+      console.error('Error guardando usuario:', error);
+      toast.error(error.message || 'Error al guardar el usuario');
     }
   };
 
@@ -221,42 +213,55 @@ const UsuariosPage = () => {
       esta_activo: usuario.esta_activo !== false
     });
     setMostrarFormulario(true);
+    setErrores({});
   };
 
   const handleEliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este usuario?')) return;
+    if (!window.confirm('¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/usuarios/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      toast.success('Usuario eliminado');
-      cargarUsuarios();
+      await usuarioService.eliminar(id);
+      toast.success('Usuario eliminado exitosamente');
+      await cargarUsuarios();
     } catch (error) {
-      toast.error('Error al eliminar');
+      console.error('Error eliminando usuario:', error);
+      toast.error(error.message || 'Error al eliminar el usuario');
     }
   };
 
   const handleToggleEstado = async (usuario) => {
+    const nuevoEstado = !usuario.esta_activo;
+    const accion = nuevoEstado ? 'activar' : 'desactivar';
+    
+    if (!window.confirm(`¿Está seguro de ${accion} este usuario?`)) return;
+    
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/usuarios/${usuario.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ esta_activo: !usuario.esta_activo })
-      });
-      
-      toast.success(`Usuario ${usuario.esta_activo ? 'desactivado' : 'activado'}`);
-      cargarUsuarios();
+      await usuarioService.cambiarEstado(usuario.id, nuevoEstado);
+      toast.success(`Usuario ${accion}do exitosamente`);
+      await cargarUsuarios();
     } catch (error) {
-      toast.error('Error al cambiar estado');
+      console.error('Error cambiando estado:', error);
+      toast.error(error.message || `Error al ${accion} el usuario`);
     }
+  };
+
+  const cerrarFormulario = () => {
+    setMostrarFormulario(false);
+    setUsuarioEditando(null);
+    setFormData({
+      codigo_militar: '',
+      nombre_completo: '',
+      email: '',
+      contrasena: '',
+      grado: '',
+      especialidad: '',
+      telefono: '',
+      rol_id: '',
+      sector_id: '',
+      esta_activo: true
+    });
+    setErrores({});
+    setMostrarPassword(false);
   };
 
   const handleLimpiarFiltros = () => {
@@ -427,7 +432,7 @@ const UsuariosPage = () => {
           <div className="modal modal-lg">
             <div className="modal-header">
               <h2>{usuarioEditando ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
-              <button onClick={() => { setMostrarFormulario(false); setUsuarioEditando(null); setErrores({}); }}>
+              <button onClick={cerrarFormulario}>
                 <FiX />
               </button>
             </div>
@@ -557,7 +562,7 @@ const UsuariosPage = () => {
               </div>
               
               <div className="modal-actions">
-                <button type="button" onClick={() => { setMostrarFormulario(false); setUsuarioEditando(null); setErrores({}); }}>
+                <button type="button" onClick={cerrarFormulario}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary">

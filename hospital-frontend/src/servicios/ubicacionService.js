@@ -1,5 +1,5 @@
 import api from './api';
-
+// src/servicios/ubicacionService.js
 export const ubicacionService = {
   // Obtener todas las ubicaciones
   obtenerTodos: async (params = {}) => {

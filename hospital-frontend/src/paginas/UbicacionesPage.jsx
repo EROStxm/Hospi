@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiFilter } from 'react-icons/fi';
-import { ubicacionService } from '../servicios/ubicacionService.js';
-
+import { ubicacionService } from '../servicios/ubicacionService';
+import { sectorService } from '../servicios/sectorService';
 
 const UbicacionesPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
@@ -30,41 +30,56 @@ const UbicacionesPage = () => {
   });
 
   useEffect(() => {
-    cargarUbicaciones();
-    cargarSectores();
+    cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
     filtrarUbicaciones();
   }, [ubicaciones, search, sectorFiltro, estadoFiltro]);
 
-  const cargarUbicaciones = async () => {
+  const cargarDatosIniciales = async () => {
     try {
       setCargando(true);
-      const response = await ubicacionService.obtenerTodos();
-      if (response.success) {
-        const datos = response.data?.data || response.data || response;
-        setUbicaciones(Array.isArray(datos) ? datos : []);
-      }
+      await Promise.all([
+        cargarUbicaciones(),
+        cargarSectores()
+      ]);
     } catch (error) {
-      toast.error('Error al cargar ubicaciones');
+      console.error('Error cargando datos:', error);
+      toast.error('Error al cargar los datos');
     } finally {
       setCargando(false);
     }
   };
 
+  const cargarUbicaciones = async () => {
+    try {
+      const response = await ubicacionService.obtenerTodos();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setUbicaciones(Array.isArray(datos) ? datos : []);
+      } else {
+        setUbicaciones([]);
+      }
+    } catch (error) {
+      console.error('Error cargando ubicaciones:', error);
+      toast.error(error.message || 'Error al cargar ubicaciones');
+      setUbicaciones([]);
+    }
+  };
+
   const cargarSectores = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/sectores', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setSectores(data.data?.data || data.data || []);
+      const response = await sectorService.obtenerTodos();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setSectores(Array.isArray(datos) ? datos : []);
+      } else {
+        setSectores([]);
       }
     } catch (error) {
       console.error('Error cargando sectores:', error);
+      setSectores([]);
     }
   };
 
@@ -89,8 +104,26 @@ const UbicacionesPage = () => {
     setUbicacionesFiltradas(filtradas);
   };
 
+  const validarFormulario = () => {
+    if (!formData.sector_id) {
+      toast.error('Debe seleccionar un sector');
+      return false;
+    }
+    if (!formData.codigo?.trim()) {
+      toast.error('El código es requerido');
+      return false;
+    }
+    if (!formData.nombre?.trim()) {
+      toast.error('El nombre es requerido');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validarFormulario()) return;
     
     try {
       let response;
@@ -101,36 +134,59 @@ const UbicacionesPage = () => {
       }
       
       if (response.success) {
-        toast.success(ubicacionEditando ? 'Ubicación actualizada' : 'Ubicación creada');
-        setMostrarFormulario(false);
-        setUbicacionEditando(null);
-        setFormData({
-          sector_id: '', codigo: '', nombre: '', descripcion: '',
-          piso: '', numero_consultorio: '', es_critico: false, esta_activo: true
-        });
-        cargarUbicaciones();
+        toast.success(ubicacionEditando ? 'Ubicación actualizada exitosamente' : 'Ubicación creada exitosamente');
+        cerrarFormulario();
+        await cargarUbicaciones();
+      } else {
+        toast.error(response.message || 'Error al guardar la ubicación');
       }
     } catch (error) {
-      toast.error('Error al guardar');
+      console.error('Error guardando ubicación:', error);
+      toast.error(error.message || 'Error al guardar la ubicación');
     }
   };
 
   const handleEditar = (ubicacion) => {
     setUbicacionEditando(ubicacion);
-    setFormData(ubicacion);
+    setFormData({
+      sector_id: ubicacion.sector_id || '',
+      codigo: ubicacion.codigo || '',
+      nombre: ubicacion.nombre || '',
+      descripcion: ubicacion.descripcion || '',
+      piso: ubicacion.piso || '',
+      numero_consultorio: ubicacion.numero_consultorio || '',
+      es_critico: ubicacion.es_critico || false,
+      esta_activo: ubicacion.esta_activo !== false
+    });
     setMostrarFormulario(true);
   };
 
   const handleEliminar = async (id) => {
-    if (!window.confirm('¿Eliminar esta ubicación?')) return;
+    if (!window.confirm('¿Está seguro de eliminar esta ubicación? Esta acción no se puede deshacer.')) return;
     
     try {
       await ubicacionService.eliminar(id);
-      toast.success('Ubicación eliminada');
-      cargarUbicaciones();
+      toast.success('Ubicación eliminada exitosamente');
+      await cargarUbicaciones();
     } catch (error) {
-      toast.error(error.message || 'Error al eliminar');
+      console.error('Error eliminando ubicación:', error);
+      toast.error(error.message || 'Error al eliminar la ubicación');
     }
+  };
+
+  const cerrarFormulario = () => {
+    setMostrarFormulario(false);
+    setUbicacionEditando(null);
+    setFormData({
+      sector_id: '',
+      codigo: '',
+      nombre: '',
+      descripcion: '',
+      piso: '',
+      numero_consultorio: '',
+      es_critico: false,
+      esta_activo: true
+    });
   };
 
   const handleLimpiarFiltros = () => {
@@ -224,6 +280,9 @@ const UbicacionesPage = () => {
       {/* Info resultados */}
       <div className="resultados-info">
         <span>{ubicacionesFiltradas.length} ubicaciones encontradas</span>
+        {filtrosActivos && (
+          <span className="filtros-activos">Filtros activos</span>
+        )}
       </div>
 
       {/* Tabla */}
@@ -243,9 +302,14 @@ const UbicacionesPage = () => {
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan="8" className="text-center">Cargando...</td></tr>
+              <tr><td colSpan="8" className="text-center">
+                <div className="spinner"></div>
+                Cargando...
+              </td></tr>
             ) : ubicacionesFiltradas.length === 0 ? (
-              <tr><td colSpan="8" className="text-center">No hay ubicaciones</td></tr>
+              <tr><td colSpan="8" className="text-center">
+                No hay ubicaciones registradas
+              </td></tr>
             ) : (
               ubicacionesFiltradas.map(ubicacion => (
                 <tr key={ubicacion.id}>
@@ -265,14 +329,22 @@ const UbicacionesPage = () => {
                     </span>
                   </td>
                   <td>
-                    <button className="btn-icon" onClick={() => handleEditar(ubicacion)}>
+                    <button 
+                      className="btn-icon" 
+                      onClick={() => handleEditar(ubicacion)}
+                      title="Editar"
+                    >
                       <FiEdit2 />
                     </button>
-                    <button className="btn-icon danger" onClick={() => handleEliminar(ubicacion.id)}>
+                    <button 
+                      className="btn-icon danger" 
+                      onClick={() => handleEliminar(ubicacion.id)}
+                      title="Eliminar"
+                    >
                       <FiTrash2 />
                     </button>
-                  </td>
-                </tr>
+                   </td>
+                 </tr>
               ))
             )}
           </tbody>
@@ -285,7 +357,7 @@ const UbicacionesPage = () => {
           <div className="modal">
             <div className="modal-header">
               <h2>{ubicacionEditando ? 'Editar Ubicación' : 'Nueva Ubicación'}</h2>
-              <button onClick={() => { setMostrarFormulario(false); setUbicacionEditando(null); }}>
+              <button onClick={cerrarFormulario}>
                 <FiX />
               </button>
             </div>
@@ -313,6 +385,7 @@ const UbicacionesPage = () => {
                     value={formData.codigo}
                     onChange={(e) => setFormData({...formData, codigo: e.target.value})}
                     required
+                    placeholder="Ej: CONSULT-101"
                   />
                 </div>
                 
@@ -323,6 +396,7 @@ const UbicacionesPage = () => {
                     value={formData.nombre}
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                     required
+                    placeholder="Ej: Consultorio 101"
                   />
                 </div>
                 
@@ -332,6 +406,7 @@ const UbicacionesPage = () => {
                     type="number"
                     value={formData.piso}
                     onChange={(e) => setFormData({...formData, piso: e.target.value})}
+                    placeholder="Número de piso"
                   />
                 </div>
                 
@@ -341,6 +416,7 @@ const UbicacionesPage = () => {
                     type="text"
                     value={formData.numero_consultorio}
                     onChange={(e) => setFormData({...formData, numero_consultorio: e.target.value})}
+                    placeholder="Ej: 101, A-101"
                   />
                 </div>
                 
@@ -350,6 +426,7 @@ const UbicacionesPage = () => {
                     value={formData.descripcion}
                     onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
                     rows="2"
+                    placeholder="Descripción adicional de la ubicación"
                   />
                 </div>
                 
@@ -377,7 +454,7 @@ const UbicacionesPage = () => {
               </div>
               
               <div className="modal-actions">
-                <button type="button" onClick={() => setMostrarFormulario(false)}>
+                <button type="button" onClick={cerrarFormulario}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary">

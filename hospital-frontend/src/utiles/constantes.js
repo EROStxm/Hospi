@@ -1,6 +1,6 @@
 // URL de la API
 export const API_URL = 'http://localhost:8000/api';
-
+//src/utiles/constantes.js
 // Roles del sistema
 export const ROLES = {
   ADMIN: 'admin_sistema',
