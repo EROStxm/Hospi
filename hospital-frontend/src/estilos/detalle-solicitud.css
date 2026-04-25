@@ -549,3 +549,28 @@
   background: #d1fae5;
   color: #059669;
 }
+/* En detalle-solicitud.css */
+.timeline-item.current {
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+}
+
+.timeline-item.current .timeline-icon {
+  color: #3b82f6;
+  animation: pulse 1.5s infinite;
+}
+
+.firma-item.current {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+}
+
+.firma-item.en-proceso {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

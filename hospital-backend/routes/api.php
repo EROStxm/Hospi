@@ -97,9 +97,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
     // =============================================
-    // RUTAS DE LECTURA (varios roles)
+    // RUTAS DE LECTURA (todos los usuarios autenticados pueden acceder)
     // =============================================
-    Route::middleware('role:admin_sistema,jefe_soporte,soporte_tecnico,jefe_servicio')->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
         Route::get('/equipos', [EquipoController::class, 'index']);
         Route::get('/equipos/{id}', [EquipoController::class, 'show']);
         Route::get('/materiales', [MaterialController::class, 'index']);

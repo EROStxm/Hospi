@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { solicitudService } from '../servicios/solicitudService';
 import { usuarioService } from '../servicios/usuarioService';
 import { materialService } from '../servicios/materialService';
+import { sectorService } from '../servicios/sectorService';
 import toast from 'react-hot-toast';
 import { 
   FiArrowLeft, FiCheckCircle, FiClock, FiAlertCircle, FiTool, 
@@ -22,6 +23,7 @@ const DetalleSolicitudPage = () => {
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [tecnicos, setTecnicos] = useState([]);
   const [materiales, setMateriales] = useState([]);
+  const [sectores, setSectores] = useState([]); // ← AGREGADO
   const [comentarios, setComentarios] = useState([]);
   
   // Estados para modales
@@ -56,6 +58,7 @@ const DetalleSolicitudPage = () => {
     cargarSolicitud();
     cargarTecnicos();
     cargarMateriales();
+    cargarSectores(); // ← AGREGADO
   }, [id]);
 
   const cargarUsuarioActual = () => {
@@ -98,6 +101,19 @@ const DetalleSolicitudPage = () => {
       }
     } catch (error) {
       console.error('Error cargando materiales:', error);
+    }
+  };
+
+  // ← FUNCIÓN AGREGADA PARA CARGAR SECTORES
+  const cargarSectores = async () => {
+    try {
+      const response = await sectorService.obtenerTodos();
+      if (response.success) {
+        const datos = response.data?.data || response.data || response;
+        setSectores(Array.isArray(datos) ? datos : []);
+      }
+    } catch (error) {
+      console.error('Error cargando sectores:', error);
     }
   };
 
@@ -204,6 +220,22 @@ const DetalleSolicitudPage = () => {
       }
     } catch (error) {
       toast.error('Error al firmar');
+    } finally {
+      setCargandoAccion(false);
+    }
+  };
+
+  // Firmar como jefe mantenimiento (cierre)
+  const handleFirmarJefeMantenimiento = async () => {
+    try {
+      setCargandoAccion(true);
+      const response = await solicitudService.firmar(id);
+      if (response.success) {
+        toast.success('Solicitud cerrada correctamente');
+        cargarSolicitud();
+      }
+    } catch (error) {
+      toast.error('Error al cerrar la solicitud');
     } finally {
       setCargandoAccion(false);
     }
@@ -461,14 +493,14 @@ const DetalleSolicitudPage = () => {
             )}
             
             {puedeFirmarJefeMantenimiento() && (
-              <button className="btn-accion btn-success" onClick={handleFirmarJefeActivos} disabled={cargandoAccion}>
-                <FiCheck /> Firmar como Jefe de Mantenimiento
+              <button className="btn-accion btn-success" onClick={handleFirmarJefeMantenimiento} disabled={cargandoAccion}>
+                <FiCheck /> Cerrar Solicitud
               </button>
             )}
           </div>
         </div>
 
-        {/* Quién debe firmar */}
+        {/* Quién debe firmar - CORREGIDO */}
         <div className="info-card firmas-pendientes">
           <h3>⏳ Firmas Pendientes</h3>
           <div className="firmas-list">
@@ -521,61 +553,73 @@ const DetalleSolicitudPage = () => {
             )}
           </div>
         </div>
-        {/* Timeline de estados */}
+
+        {/* Timeline de estados - CORREGIDO (siempre muestra todos los pasos) */}
         <div className="timeline-card">
           <h3>Seguimiento</h3>
           
           <div className="timeline">
-            <div className={`timeline-item ${solicitud.solicitante_firmo_en ? 'completed' : 'pending'}`}>
+            {/* 1. Firma del Solicitante */}
+            <div className={`timeline-item ${solicitud.solicitante_firmo_en ? 'completed' : solicitud.estado === 'pendiente_solicitante' ? 'current' : 'pending'}`}>
               <div className="timeline-icon">
                 {solicitud.solicitante_firmo_en ? <FiCheckCircle /> : <FiClock />}
               </div>
               <div className="timeline-content">
-                <h4>Firma del Solicitante</h4>
+                <h4>1. Firma del Solicitante</h4>
                 <p>{solicitud.solicitante_firmo_en ? formatearFecha(solicitud.solicitante_firmo_en) : 'Pendiente'}</p>
+                <small>{solicitud.solicitante?.nombre_completo}</small>
               </div>
             </div>
 
-            {solicitud.tipo_solicitud === 'con_material' && (
-              <>
-                <div className={`timeline-item ${solicitud.jefe_seccion_firmo_en ? 'completed' : 'pending'}`}>
-                  <div className="timeline-icon">
-                    {solicitud.jefe_seccion_firmo_en ? <FiCheckCircle /> : <FiClock />}
-                  </div>
-                  <div className="timeline-content">
-                    <h4>Firma Jefe de Sección</h4>
-                    <p>{solicitud.jefe_seccion_firmo_en ? formatearFecha(solicitud.jefe_seccion_firmo_en) : 'Pendiente'}</p>
-                  </div>
-                </div>
+            {/* 2. Firma Jefe de Sección - SIEMPRE SE MUESTRA */}
+            <div className={`timeline-item ${solicitud.jefe_seccion_firmo_en ? 'completed' : solicitud.estado === 'pendiente_jefe_seccion' ? 'current' : 'pending'}`}>
+              <div className="timeline-icon">
+                {solicitud.jefe_seccion_firmo_en ? <FiCheckCircle /> : <FiClock />}
+              </div>
+              <div className="timeline-content">
+                <h4>2. Aprobación del Jefe de Servicio</h4>
+                <p>{solicitud.jefe_seccion_firmo_en ? formatearFecha(solicitud.jefe_seccion_firmo_en) : 'Pendiente'}</p>
+                {solicitud.jefeSeccion?.nombre_completo && (
+                  <small>Firmado por: {solicitud.jefeSeccion.nombre_completo}</small>
+                )}
+              </div>
+            </div>
 
-                <div className={`timeline-item ${solicitud.jefe_activos_firmo_en ? 'completed' : 'pending'}`}>
-                  <div className="timeline-icon">
-                    {solicitud.jefe_activos_firmo_en ? <FiCheckCircle /> : <FiClock />}
-                  </div>
-                  <div className="timeline-content">
-                    <h4>Firma Jefe de Activos</h4>
-                    <p>{solicitud.jefe_activos_firmo_en ? formatearFecha(solicitud.jefe_activos_firmo_en) : 'Pendiente'}</p>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* 3. Firma Jefe de Activos - SIEMPRE SE MUESTRA */}
+            <div className={`timeline-item ${solicitud.jefe_activos_firmo_en ? 'completed' : solicitud.estado === 'pendiente_jefe_activos' ? 'current' : 'pending'}`}>
+              <div className="timeline-icon">
+                {solicitud.jefe_activos_firmo_en ? <FiCheckCircle /> : <FiClock />}
+              </div>
+              <div className="timeline-content">
+                <h4>3. Autorización de Jefe de Activos/Soporte</h4>
+                <p>{solicitud.jefe_activos_firmo_en ? formatearFecha(solicitud.jefe_activos_firmo_en) : 'Pendiente'}</p>
+                {solicitud.jefeActivos?.nombre_completo && (
+                  <small>Firmado por: {solicitud.jefeActivos.nombre_completo}</small>
+                )}
+              </div>
+            </div>
 
-            <div className={`timeline-item ${solicitud.tecnico_asignado_id ? 'completed' : 'pending'}`}>
+            {/* 4. Asignación de Técnico */}
+            <div className={`timeline-item ${solicitud.tecnico_asignado_id ? 'completed' : solicitud.estado === 'pendiente_soporte' ? 'current' : 'pending'}`}>
               <div className="timeline-icon">
                 {solicitud.tecnico_asignado_id ? <FiCheckCircle /> : <FiClock />}
               </div>
               <div className="timeline-content">
-                <h4>Técnico Asignado</h4>
+                <h4>4. Asignación de Técnico</h4>
                 <p>{solicitud.tecnicoAsignado?.nombre_completo || 'Pendiente de asignación'}</p>
+                {solicitud.tecnico_asignado_en && (
+                  <small>Asignado: {formatearFecha(solicitud.tecnico_asignado_en)}</small>
+                )}
               </div>
             </div>
 
-            <div className={`timeline-item ${solicitud.trabajo_terminado_en ? 'completed' : 'pending'}`}>
+            {/* 5. Trabajo Realizado */}
+            <div className={`timeline-item ${solicitud.trabajo_terminado_en ? 'completed' : ['asignado', 'en_proceso'].includes(solicitud.estado) ? 'current' : 'pending'}`}>
               <div className="timeline-icon">
                 {solicitud.trabajo_terminado_en ? <FiCheckCircle /> : <FiClock />}
               </div>
               <div className="timeline-content">
-                <h4>Trabajo Realizado</h4>
+                <h4>5. Ejecución del Trabajo</h4>
                 {solicitud.trabajo_terminado_en ? (
                   <>
                     <p>{formatearFecha(solicitud.trabajo_terminado_en)}</p>
@@ -589,17 +633,38 @@ const DetalleSolicitudPage = () => {
               </div>
             </div>
 
-            <div className={`timeline-item ${solicitud.conformacion_firmo_en ? 'completed' : 'pending'}`}>
+            {/* 6. Conformidad del Solicitante */}
+            <div className={`timeline-item ${solicitud.conformacion_firmo_en ? 'completed' : solicitud.estado === 'pendiente_conformacion' ? 'current' : 'pending'}`}>
               <div className="timeline-icon">
                 {solicitud.conformacion_firmo_en ? <FiCheckCircle /> : <FiClock />}
               </div>
               <div className="timeline-content">
-                <h4>Conformidad del Solicitante</h4>
+                <h4>6. Conformidad del Solicitante</h4>
                 {solicitud.conformacion_firmo_en ? (
                   <>
                     <p>{formatearFecha(solicitud.conformacion_firmo_en)}</p>
                     {solicitud.conformacion_comentario && (
                       <small className="notas">{solicitud.conformacion_comentario}</small>
+                    )}
+                  </>
+                ) : (
+                  <p>Pendiente</p>
+                )}
+              </div>
+            </div>
+
+            {/* 7. Cierre de Jefe de Mantenimiento */}
+            <div className={`timeline-item ${solicitud.jefe_mantenimiento_firmo_en ? 'completed' : solicitud.estado === 'pendiente_jefe_mantenimiento' ? 'current' : 'pending'}`}>
+              <div className="timeline-icon">
+                {solicitud.jefe_mantenimiento_firmo_en ? <FiCheckCircle /> : <FiClock />}
+              </div>
+              <div className="timeline-content">
+                <h4>7. Cierre y Validación Final</h4>
+                {solicitud.jefe_mantenimiento_firmo_en ? (
+                  <>
+                    <p>{formatearFecha(solicitud.jefe_mantenimiento_firmo_en)}</p>
+                    {solicitud.jefeMantenimiento?.nombre_completo && (
+                      <small>Cerrado por: {solicitud.jefeMantenimiento.nombre_completo}</small>
                     )}
                   </>
                 ) : (
@@ -640,6 +705,7 @@ const DetalleSolicitudPage = () => {
             </button>
           </div>
         </div>
+        
         <div className="imagenes-card">
           <h3>📷 Imágenes</h3>
           <SubirImagenes 

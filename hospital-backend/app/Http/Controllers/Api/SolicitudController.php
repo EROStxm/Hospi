@@ -327,6 +327,7 @@ class SolicitudController extends Controller
         $user = $request->user();
         
         switch ($solicitud->estado) {
+            // En SolicitudController.php - método firmar
             case 'pendiente_solicitante':
                 // Solo el solicitante puede firmar
                 if ($solicitud->solicitante_id !== $user->id) {
@@ -337,9 +338,7 @@ class SolicitudController extends Controller
                     'solicitante_firmo_en' => now(),
                     'solicitante_ip' => $request->ip(),
                     'solicitante_dispositivo' => $request->header('User-Agent'),
-                    'estado' => $solicitud->tipo_solicitud === 'con_material' 
-                        ? 'pendiente_jefe_seccion' 
-                        : 'pendiente_soporte'
+                    'estado' => 'pendiente_jefe_seccion'  // ← SIEMPRE va a jefe de sección
                 ]);
                 break;
 
