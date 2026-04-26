@@ -109,3 +109,31 @@
     font-size: 12px;
   }
 }
+/* Estilos existentes... */
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Estilos para el contenedor de notificaciones en el navbar */
+.navbar-user .campana-notificaciones {
+  position: relative;
+}
+
+/* Ajuste responsive para móviles */
+@media (max-width: 768px) {
+  .navbar-user {
+    gap: 10px;
+  }
+  
+  .user-info {
+    display: none; /* Oculta la información del usuario en móvil si es necesario */
+  }
+  
+  .btn-logout {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}

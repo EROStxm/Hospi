@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Api/SolicitudController.php
 
 namespace App\Http\Controllers\Api;
 
@@ -11,6 +10,7 @@ use App\Models\User;
 use App\Models\Material;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\NotificacionHelper;
 
 class SolicitudController extends Controller
 {
@@ -70,7 +70,7 @@ class SolicitudController extends Controller
     }
 
     /**
-     * Ver MIS solicitudes - ¡ESTE ES EL MÉTODO QUE FALTABA!
+     * Ver MIS solicitudes
      */
     public function misSolicitudes(Request $request)
     {
@@ -85,7 +85,6 @@ class SolicitudController extends Controller
         }
         
         try {
-            // Consulta directa con DB para evitar problemas de relaciones
             $solicitudes = DB::select("
                 SELECT 
                     s.id,
@@ -106,7 +105,6 @@ class SolicitudController extends Controller
                 ORDER BY s.creado_en DESC
             ", [$user->id]);
             
-            // Formatear respuesta
             $resultado = [];
             foreach ($solicitudes as $sol) {
                 $resultado[] = [
@@ -134,31 +132,9 @@ class SolicitudController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            // Si hay error, devolver datos mock
             return response()->json([
                 'success' => true,
-                'data' => [
-                    [
-                        'id' => 1,
-                        'tipo_solicitud' => 'sin_material',
-                        'titulo' => 'Monitor no enciende',
-                        'descripcion' => 'El monitor de signos vitales no enciende',
-                        'estado' => 'completado',
-                        'creado_en' => '2024-01-10 08:30:00',
-                        'equipo' => ['nombre' => 'Monitor Signos Vitales UCI 01'],
-                        'sector' => ['nombre' => 'Cardiología']
-                    ],
-                    [
-                        'id' => 2,
-                        'tipo_solicitud' => 'con_material',
-                        'titulo' => 'Ventilador con alarma',
-                        'descripcion' => 'Alarma de presión alta intermitente',
-                        'estado' => 'pendiente_jefe_seccion',
-                        'creado_en' => '2024-01-15 09:15:00',
-                        'equipo' => ['nombre' => 'Ventilador UCI 01'],
-                        'sector' => ['nombre' => 'UCI']
-                    ]
-                ]
+                'data' => []
             ]);
         }
     }
@@ -237,7 +213,6 @@ class SolicitudController extends Controller
     /**
      * Crear nueva solicitud
      */
-    
     public function store(Request $request)
     {
         $request->validate([
@@ -260,6 +235,16 @@ class SolicitudController extends Controller
             'estado' => 'pendiente_solicitante',
         ]);
 
+        // NOTIFICACIÓN: Confirmación al solicitante
+        NotificacionHelper::enviar(
+            $user->id,
+            'Solicitud creada',
+            "Tu solicitud #{$solicitud->id} ha sido creada exitosamente",
+            'success',
+            "/mis-solicitudes",
+            $solicitud->id
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Solicitud creada correctamente',
@@ -270,8 +255,6 @@ class SolicitudController extends Controller
     /**
      * Ver detalle de solicitud
      */
-    // En app/Http/Controllers/Api/SolicitudController.php
-
     public function show($id, Request $request)
     {
         $user = $request->user();
@@ -325,9 +308,9 @@ class SolicitudController extends Controller
     {
         $solicitud = Solicitud::findOrFail($id);
         $user = $request->user();
+        $nuevoEstado = '';
         
         switch ($solicitud->estado) {
-            // En SolicitudController.php - método firmar
             case 'pendiente_solicitante':
                 // Solo el solicitante puede firmar
                 if ($solicitud->solicitante_id !== $user->id) {
@@ -338,8 +321,19 @@ class SolicitudController extends Controller
                     'solicitante_firmo_en' => now(),
                     'solicitante_ip' => $request->ip(),
                     'solicitante_dispositivo' => $request->header('User-Agent'),
-                    'estado' => 'pendiente_jefe_seccion'  // ← SIEMPRE va a jefe de sección
+                    'estado' => 'pendiente_jefe_seccion'
                 ]);
+                $nuevoEstado = 'pendiente_jefe_seccion';
+                
+                // NOTIFICACIÓN: Al jefe de servicio
+                NotificacionHelper::enviarAJefeServicio(
+                    $solicitud->sector_id,
+                    'Nueva solicitud para firmar',
+                    "La solicitud #{$solicitud->id} de {$solicitud->solicitante->nombre} requiere su firma como Jefe de Servicio",
+                    'warning',
+                    "/para-firmar",
+                    $solicitud->id
+                );
                 break;
 
             case 'pendiente_jefe_seccion':
@@ -354,6 +348,26 @@ class SolicitudController extends Controller
                     'jefe_seccion_ip' => $request->ip(),
                     'estado' => 'pendiente_jefe_activos'
                 ]);
+                $nuevoEstado = 'pendiente_jefe_activos';
+                
+                // NOTIFICACIÓN: Al jefe de soporte
+                NotificacionHelper::enviarAJefeSoporte(
+                    'Solicitud lista para autorizar',
+                    "La solicitud #{$solicitud->id} de {$solicitud->solicitante->nombre} requiere autorización de Jefe de Soporte",
+                    'info',
+                    "/solicitudes-pendientes",
+                    $solicitud->id
+                );
+                
+                // NOTIFICACIÓN: Al solicitante
+                NotificacionHelper::enviar(
+                    $solicitud->solicitante_id,
+                    'Solicitud aprobada por Jefe de Servicio',
+                    "Tu solicitud #{$solicitud->id} ha sido aprobada por tu Jefe de Servicio y enviada a Soporte Técnico",
+                    'success',
+                    "/mis-solicitudes",
+                    $solicitud->id
+                );
                 break;
 
             case 'pendiente_jefe_activos':
@@ -368,6 +382,26 @@ class SolicitudController extends Controller
                     'jefe_activos_ip' => $request->ip(),
                     'estado' => 'pendiente_soporte'
                 ]);
+                $nuevoEstado = 'pendiente_soporte';
+                
+                // NOTIFICACIÓN: A todos los técnicos
+                NotificacionHelper::enviarATecnicos(
+                    'Nueva solicitud disponible',
+                    "La solicitud #{$solicitud->id} está lista para ser atendida por Soporte Técnico",
+                    'info',
+                    "/mis-trabajos",
+                    $solicitud->id
+                );
+                
+                // NOTIFICACIÓN: Al solicitante
+                NotificacionHelper::enviar(
+                    $solicitud->solicitante_id,
+                    'Solicitud autorizada',
+                    "Tu solicitud #{$solicitud->id} ha sido autorizada y está pendiente de asignación a un técnico",
+                    'info',
+                    "/mis-solicitudes",
+                    $solicitud->id
+                );
                 break;
 
             case 'pendiente_conformacion':
@@ -383,6 +417,28 @@ class SolicitudController extends Controller
                     'conformacion_comentario' => $request->comentario ?? 'Trabajo conforme',
                     'estado' => 'pendiente_jefe_mantenimiento'
                 ]);
+                $nuevoEstado = 'pendiente_jefe_mantenimiento';
+                
+                // NOTIFICACIÓN: Al jefe de soporte
+                NotificacionHelper::enviarAJefeSoporte(
+                    'Trabajo pendiente de cierre',
+                    "La solicitud #{$solicitud->id} está pendiente de su firma para completar el proceso",
+                    'warning',
+                    "/solicitudes-pendientes",
+                    $solicitud->id
+                );
+                
+                // NOTIFICACIÓN: Al técnico asignado
+                if ($solicitud->tecnico_asignado_id) {
+                    NotificacionHelper::enviar(
+                        $solicitud->tecnico_asignado_id,
+                        'Trabajo conforme',
+                        "El solicitante ha dado conformidad al trabajo realizado en la solicitud #{$solicitud->id}",
+                        'success',
+                        "/mis-trabajos",
+                        $solicitud->id
+                    );
+                }
                 break;
 
             case 'pendiente_jefe_mantenimiento':
@@ -397,6 +453,29 @@ class SolicitudController extends Controller
                     'jefe_mantenimiento_ip' => $request->ip(),
                     'estado' => 'completado'
                 ]);
+                $nuevoEstado = 'completado';
+                
+                // NOTIFICACIÓN: Al solicitante
+                NotificacionHelper::enviar(
+                    $solicitud->solicitante_id,
+                    'Solicitud completada ✅',
+                    "Tu solicitud #{$solicitud->id} ha sido completada exitosamente",
+                    'success',
+                    "/mis-solicitudes",
+                    $solicitud->id
+                );
+                
+                // NOTIFICACIÓN: Al técnico asignado
+                if ($solicitud->tecnico_asignado_id) {
+                    NotificacionHelper::enviar(
+                        $solicitud->tecnico_asignado_id,
+                        'Solicitud cerrada',
+                        "La solicitud #{$solicitud->id} ha sido cerrada oficialmente. Buen trabajo! 🎉",
+                        'success',
+                        "/mis-trabajos",
+                        $solicitud->id
+                    );
+                }
                 break;
 
             default:
@@ -430,6 +509,26 @@ class SolicitudController extends Controller
             'estado' => 'asignado'
         ]);
 
+        // NOTIFICACIÓN: Al técnico asignado
+        NotificacionHelper::enviar(
+            $request->tecnico_id,
+            'Nueva asignación de trabajo 🔧',
+            "Se te ha asignado la solicitud #{$solicitud->id}: {$solicitud->titulo}",
+            'info',
+            "/mis-trabajos",
+            $solicitud->id
+        );
+        
+        // NOTIFICACIÓN: Al solicitante
+        NotificacionHelper::enviar(
+            $solicitud->solicitante_id,
+            'Técnico asignado',
+            "Se ha asignado un técnico a tu solicitud #{$solicitud->id}",
+            'info',
+            "/mis-solicitudes",
+            $solicitud->id
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Técnico asignado correctamente',
@@ -454,6 +553,25 @@ class SolicitudController extends Controller
             'estado' => 'pendiente_conformacion'
         ]);
 
+        // NOTIFICACIÓN: Al solicitante
+        NotificacionHelper::enviar(
+            $solicitud->solicitante_id,
+            'Trabajo completado - Pendiente conformidad',
+            "El técnico ha completado el trabajo en la solicitud #{$solicitud->id}. Por favor, da tu conformidad para cerrar el proceso.",
+            'success',
+            "/mis-solicitudes",
+            $solicitud->id
+        );
+        
+        // NOTIFICACIÓN: Al jefe de soporte
+        NotificacionHelper::enviarAJefeSoporte(
+            'Trabajo completado',
+            "El técnico ha completado el trabajo en la solicitud #{$solicitud->id}. Pendiente conformidad del solicitante.",
+            'info',
+            "/solicitudes-pendientes",
+            $solicitud->id
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Trabajo completado',
@@ -466,13 +584,62 @@ class SolicitudController extends Controller
      */
     public function usarMaterial(Request $request, $id)
     {
+        $request->validate([
+            'materiales' => 'required|array',
+            'materiales.*.material_id' => 'required|exists:materiales,id',
+            'materiales.*.cantidad' => 'required|integer|min:1'
+        ]);
+
         $solicitud = Solicitud::findOrFail($id);
         
-        return response()->json([
-            'success' => true,
-            'message' => 'Material registrado correctamente'
-        ]);
+        DB::beginTransaction();
+        try {
+            foreach ($request->materiales as $item) {
+                $material = Material::find($item['material_id']);
+                
+                // Verificar stock
+                if ($material->stock < $item['cantidad']) {
+                    throw new \Exception("Stock insuficiente para {$material->nombre}");
+                }
+                
+                // Reducir stock
+                $material->decrement('stock', $item['cantidad']);
+                
+                // Registrar en solicitudes_materiales
+                DB::table('solicitudes_materiales')->insert([
+                    'solicitud_id' => $solicitud->id,
+                    'material_id' => $item['material_id'],
+                    'cantidad' => $item['cantidad'],
+                    'creado_en' => now()
+                ]);
+            }
+            
+            DB::commit();
+            
+            // NOTIFICACIÓN: Al solicitante
+            NotificacionHelper::enviar(
+                $solicitud->solicitante_id,
+                'Materiales utilizados',
+                "Se han utilizado materiales en tu solicitud #{$solicitud->id}",
+                'info',
+                "/solicitudes/{$solicitud->id}",
+                $solicitud->id
+            );
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Materiales registrados correctamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
     }
+    
     /**
      * Obtener estadísticas para el Dashboard
      */
@@ -510,6 +677,26 @@ class SolicitudController extends Controller
         
         $completadas = (clone $query)->where('estado', 'completado')->count();
         
+        // Solicitudes por mes para gráficos
+        $solicitudesPorMes = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $mes = now()->subMonths($i);
+            $count = (clone $query)->whereYear('creado_en', $mes->year)
+                ->whereMonth('creado_en', $mes->month)
+                ->count();
+            $solicitudesPorMes[] = [
+                'mes' => $mes->locale('es')->monthName,
+                'total' => $count
+            ];
+        }
+        
+        // Distribución por estado
+        $distribucionEstados = [
+            'pendientes' => $pendientes,
+            'en_proceso' => $enProceso,
+            'completadas' => $completadas
+        ];
+        
         // Últimas 5 solicitudes
         $recientes = (clone $query)->with(['solicitante', 'equipo', 'sector'])
             ->orderBy('creado_en', 'desc')
@@ -532,6 +719,8 @@ class SolicitudController extends Controller
                 'en_proceso' => $enProceso,
                 'completadas' => $completadas,
                 'stock_bajo' => $stockBajo,
+                'solicitudes_por_mes' => $solicitudesPorMes,
+                'distribucion_estados' => $distribucionEstados,
                 'recientes' => $recientes
             ]
         ]);
@@ -558,6 +747,18 @@ class SolicitudController extends Controller
         }
         
         $solicitud->update(['rutas_fotos' => $rutas]);
+
+        // NOTIFICACIÓN: Al técnico (si está asignado) que hay nuevas imágenes
+        if ($solicitud->tecnico_asignado_id) {
+            NotificacionHelper::enviar(
+                $solicitud->tecnico_asignado_id,
+                'Nuevas imágenes subidas',
+                "Se han subido nuevas imágenes a la solicitud #{$solicitud->id}",
+                'info',
+                "/solicitudes/{$solicitud->id}",
+                $solicitud->id
+            );
+        }
         
         return response()->json([
             'success' => true,
@@ -565,5 +766,4 @@ class SolicitudController extends Controller
             'data' => ['rutas_fotos' => $rutas]
         ]);
     }
-    
 }

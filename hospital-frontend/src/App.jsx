@@ -1,4 +1,3 @@
-// src/App.jsx - CORREGIDO
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { authService } from './servicios/authService';
@@ -17,11 +16,9 @@ import SectoresPage from './paginas/SectoresPage.jsx';
 import MisTrabajosPage from './paginas/MisTrabajosPage';
 import SolicitudesPendientesPage from './paginas/SolicitudesPendientesPage';
 import EquiposPage from './paginas/EquiposPage';
-
 import ParaFirmarPage from './paginas/ParaFirmarPage';
 import SolicitudesSectorPage from './paginas/SolicitudesSectorPage';
-
-// ELIMINAR ESTA LÍNEA DUPLICADA: import NuevaSolicitudPage from './paginas/NuevaSolicitudPage';
+import NotificacionesPage from './paginas/NotificacionesPage';
 import './estilos/global.css';
 
 function AppContent() {
@@ -74,7 +71,6 @@ function AppContent() {
     );
   }
 
-  // Layout wrapper para páginas protegidas
   const ProtectedLayout = ({ children }) => (
     <Layout usuario={usuario} onLogout={manejarLogout}>
       {children}
@@ -158,6 +154,7 @@ function AppContent() {
           )
         } 
       />
+      
       <Route 
         path="/equipos" 
         element={
@@ -170,6 +167,7 @@ function AppContent() {
           )
         } 
       />
+      
       <Route 
         path="/usuarios" 
         element={
@@ -182,6 +180,7 @@ function AppContent() {
           )
         } 
       />
+      
       <Route 
         path="/materiales" 
         element={
@@ -194,6 +193,7 @@ function AppContent() {
           )
         } 
       />
+      
       <Route 
         path="/solicitudes/:id" 
         element={
@@ -206,6 +206,7 @@ function AppContent() {
           )
         } 
       />
+      
       <Route 
         path="/ubicaciones" 
         element={
@@ -231,22 +232,71 @@ function AppContent() {
           )
         } 
       />
-      <Route path="mis-asignaciones" element={
-        autenticado ? <ProtectedLayout><MisTrabajosPage /></ProtectedLayout> : <Navigate to="/login" replace />
-      } />
+      
+      <Route 
+        path="/mis-asignaciones" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <MisTrabajosPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
 
-      <Route path="/solicitudes-pendientes" element={
-        autenticado ? <ProtectedLayout><SolicitudesPendientesPage /></ProtectedLayout> : <Navigate to="/login" replace />
-      } />
+      <Route 
+        path="/solicitudes-pendientes" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <SolicitudesPendientesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
           
-      // Dentro de Routes:
-      <Route path="/para-firmar" element={
-        autenticado ? <ProtectedLayout><ParaFirmarPage /></ProtectedLayout> : <Navigate to="/login" replace />
-      } />
+      <Route 
+        path="/para-firmar" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <ParaFirmarPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
 
-      <Route path="/solicitudes-sector" element={
-        autenticado ? <ProtectedLayout><SolicitudesSectorPage /></ProtectedLayout> : <Navigate to="/login" replace />
-      } />
+      <Route 
+        path="/solicitudes-sector" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <SolicitudesSectorPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+
+      <Route 
+        path="/notificaciones" 
+        element={
+          autenticado ? (
+            <ProtectedLayout>
+              <NotificacionesPage />
+            </ProtectedLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
 
       <Route 
         path="/" 

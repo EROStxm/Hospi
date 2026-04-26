@@ -1,4 +1,5 @@
 import './Navbar.css';
+ import CampanaNotificaciones from './CampanaNotificaciones'; // Comentado hasta instalar react-icons
 
 const Navbar = ({ usuario, onLogout, onMenuClick }) => {
   return (
@@ -15,6 +16,8 @@ const Navbar = ({ usuario, onLogout, onMenuClick }) => {
         </div>
         
         <div className="navbar-user">
+          { CampanaNotificaciones && <CampanaNotificaciones /> }
+          
           <div className="user-info">
             <div className="user-name">{usuario?.nombre_completo || 'Usuario'}</div>
             <div className="user-role">{usuario?.rol?.nombre} - {usuario?.grado}</div>

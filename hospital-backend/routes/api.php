@@ -8,8 +8,15 @@ use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\SectorController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PingController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UbicacionController;
+use App\Http\Controllers\Api\NotificacionController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
 // Rutas públicas
 Route::get('/ping', [PingController::class, 'ping']);
@@ -23,6 +30,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     
     // =============================================
+    // NOTIFICACIONES
+    // =============================================
+    Route::get('/notificaciones', [NotificacionController::class, 'index']);
+    Route::get('/notificaciones/conteo-no-leidas', [NotificacionController::class, 'conteoNoLeidas']);
+    Route::put('/notificaciones/{id}/leida', [NotificacionController::class, 'marcarLeida']);
+    Route::put('/notificaciones/marcar-todas-leidas', [NotificacionController::class, 'marcarTodasLeidas']);
+    Route::delete('/notificaciones/{id}', [NotificacionController::class, 'destroy']);
+    
+    // =============================================
     // SOLICITUDES - Todos los usuarios autenticados
     // =============================================
     
@@ -32,12 +48,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Ver mis solicitudes - El usuario ve solo las suyas
     Route::get('/mis-solicitudes', [SolicitudController::class, 'misSolicitudes']);
     
-    // Ver detalle de una solicitud propia
+    // Ver detalle de una solicitud
     Route::get('/solicitudes/{id}', [SolicitudController::class, 'show']);
-        //->middleware('can:ver,solicitud');
     
     // Firmar solicitud - Según el rol que corresponda
     Route::post('/solicitudes/{id}/firmar', [SolicitudController::class, 'firmar']);
+    
+    // Subir imágenes
+    Route::post('/solicitudes/{id}/upload-imagenes', [SolicitudController::class, 'uploadImagenes']);
     
     // =============================================
     // RUTAS PARA SOPORTE TÉCNICO Y JEFE SOPORTE
@@ -94,36 +112,29 @@ Route::middleware('auth:sanctum')->group(function () {
         // CRUD de Sectores
         Route::apiResource('sectores', SectorController::class);
         
+        // CRUD de Ubicaciones
+        Route::apiResource('ubicaciones', UbicacionController::class);
+        
     });
     
     // =============================================
-    // RUTAS DE LECTURA (todos los usuarios autenticados pueden acceder)
+    // RUTAS DE LECTURA (todos los usuarios autenticados)
     // =============================================
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/equipos', [EquipoController::class, 'index']);
-        Route::get('/equipos/{id}', [EquipoController::class, 'show']);
-        Route::get('/materiales', [MaterialController::class, 'index']);
-        Route::get('/sectores', [SectorController::class, 'index']);
-        Route::get('/tecnicos', [UserController::class, 'tecnicos']);
-    });
+    Route::get('/equipos', [EquipoController::class, 'index']);
+    Route::get('/equipos/{id}', [EquipoController::class, 'show']);
+    Route::get('/materiales', [MaterialController::class, 'index']);
+    Route::get('/sectores', [SectorController::class, 'index']);
+    Route::get('/tecnicos', [UserController::class, 'tecnicos']);
+    Route::get('/ubicaciones', [UbicacionController::class, 'index']);
+    Route::get('/ubicaciones/{id}', [UbicacionController::class, 'show']);
 
-    // Rutas adicionales para Equipos
+    // Rutas adicionales
     Route::get('/equipos/sector/{sectorId}', [EquipoController::class, 'porSector']);
     Route::get('/equipos/categoria/{categoriaId}', [EquipoController::class, 'porCategoria']);
-
-    // Rutas adicionales para Materiales
     Route::post('/materiales/{id}/ajustar-stock', [MaterialController::class, 'ajustarStock']);
     Route::get('/materiales-stock-bajo', [MaterialController::class, 'stockBajo']);
-
-    // Cambiar contraseña de usuario
     Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
-    // CRUD de Ubicaciones
-    Route::apiResource('ubicaciones', UbicacionController::class);
-
-    // Ubicaciones por sector
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
-
     Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
     
-    Route::post('/solicitudes/{id}/upload-imagenes', [SolicitudController::class, 'uploadImagenes']);
 });
