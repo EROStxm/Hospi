@@ -1,5 +1,5 @@
 import api from './api';
-
+//src/servicios/notificacionService.js
 const notificacionService = {
     // Obtener todas las notificaciones
     async obtenerNotificaciones(page = 1, soloNoLeidas = false) {

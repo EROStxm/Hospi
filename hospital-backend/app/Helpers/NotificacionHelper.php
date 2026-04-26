@@ -4,7 +4,7 @@ namespace App\Helpers;
 
 use App\Models\Notificacion;
 use App\Models\User;
-
+// app/Helpers/NotificacionHelper.php
 class NotificacionHelper
 {
     /**

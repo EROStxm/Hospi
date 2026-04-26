@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 // Importación correcta para React 19
+//src/componentes/comunes/CampanaNotificaciones.jsx
 import { FiBell, FiCheck, FiCheckCircle, FiTrash2, FiX } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
