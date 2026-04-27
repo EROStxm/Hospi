@@ -15,6 +15,11 @@ import '../estilos/detalle-solicitud.css';
 
 import SubirImagenes from '../componentes/comunes/SubirImagenes';
 
+// Cambiar esta línea:
+// Por:
+import { FiDownload, FiCode } from 'react-icons/fi';
+// O usa: import { FiDownload, FiGrid } from 'react-icons/fi';
+
 const DetalleSolicitudPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,7 +28,7 @@ const DetalleSolicitudPage = () => {
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [tecnicos, setTecnicos] = useState([]);
   const [materiales, setMateriales] = useState([]);
-  const [sectores, setSectores] = useState([]); // ← AGREGADO
+  const [sectores, setSectores] = useState([]);
   const [comentarios, setComentarios] = useState([]);
   
   // Estados para modales
@@ -31,6 +36,7 @@ const DetalleSolicitudPage = () => {
   const [mostrarModalCompletar, setMostrarModalCompletar] = useState(false);
   const [mostrarModalMateriales, setMostrarModalMateriales] = useState(false);
   const [mostrarModalConformidad, setMostrarModalConformidad] = useState(false);
+  const [mostrarModalQr, setMostrarModalQr] = useState(false);
   
   // Estados para formularios
   const [tecnicoSeleccionado, setTecnicoSeleccionado] = useState('');
@@ -39,6 +45,7 @@ const DetalleSolicitudPage = () => {
   const [comentarioConformidad, setComentarioConformidad] = useState('');
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [cargandoAccion, setCargandoAccion] = useState(false);
+  const [qrCode, setQrCode] = useState(null);
 
   const estadosConfig = {
     pendiente_solicitante: { label: 'Pendiente Solicitante', color: '#f59e0b', icon: <FiClock /> },
@@ -58,7 +65,7 @@ const DetalleSolicitudPage = () => {
     cargarSolicitud();
     cargarTecnicos();
     cargarMateriales();
-    cargarSectores(); // ← AGREGADO
+    cargarSectores();
   }, [id]);
 
   const cargarUsuarioActual = () => {
@@ -133,7 +140,7 @@ const DetalleSolicitudPage = () => {
   };
 
   // =============================================
-  // ACCIONES
+  // PERMISOS
   // =============================================
 
   const puedeFirmarSolicitante = () => {
@@ -177,7 +184,10 @@ const DetalleSolicitudPage = () => {
            usuarioActual?.id === solicitud?.tecnico_asignado_id;
   };
 
-  // Firmar como solicitante
+  // =============================================
+  // ACCIONES
+  // =============================================
+
   const handleFirmarSolicitante = async () => {
     try {
       setCargandoAccion(true);
@@ -225,7 +235,7 @@ const DetalleSolicitudPage = () => {
     }
   };
 
-  // Firmar como jefe mantenimiento (cierre)
+  // Firmar como jefe de mantenimiento
   const handleFirmarJefeMantenimiento = async () => {
     try {
       setCargandoAccion(true);
@@ -334,7 +344,7 @@ const DetalleSolicitudPage = () => {
     try {
       setCargandoAccion(true);
       const materialesFormato = materialesSeleccionados.map(m => ({
-        id: m.id,
+        material_id: m.id,
         cantidad: m.cantidad
       }));
       
@@ -362,6 +372,46 @@ const DetalleSolicitudPage = () => {
     // Por ahora solo mostramos toast (el endpoint de comentarios no está implementado)
     toast.success('Comentario agregado (demo)');
     setNuevoComentario('');
+  };
+
+  const handleGenerarPdf = async () => {
+    try {
+      toast.loading('Generando PDF...', { id: 'pdf' });
+      const response = await solicitudService.generarPdf(id);
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `solicitud_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('PDF generado correctamente', { id: 'pdf' });
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al generar PDF', { id: 'pdf' });
+    }
+  };
+
+  const handleVerQr = async () => {
+    try {
+      toast.loading('Generando código QR...', { id: 'qr' });
+      const response = await solicitudService.obtenerQr(id);
+      
+      if (response.success && response.qr_code) {
+        setQrCode(response.qr_code);
+        setMostrarModalQr(true);
+        toast.success('QR generado correctamente', { id: 'qr' });
+      } else {
+        toast.error('Error al generar QR', { id: 'qr' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al generar código QR', { id: 'qr' });
+    }
   };
 
   if (cargando) {
@@ -497,10 +547,19 @@ const DetalleSolicitudPage = () => {
                 <FiCheck /> Cerrar Solicitud
               </button>
             )}
+
+            {/* Botones PDF y QR */}
+            <button className="btn-accion btn-pdf" onClick={handleGenerarPdf}>
+              <FiDownload /> Descargar PDF
+            </button>
+
+            <button className="btn-accion btn-qr" onClick={handleVerQr}>
+              <FiCode /> Ver QR
+            </button>
           </div>
         </div>
 
-        {/* Quién debe firmar - CORREGIDO */}
+        {/* Quién debe firmar */}
         <div className="info-card firmas-pendientes">
           <h3>⏳ Firmas Pendientes</h3>
           <div className="firmas-list">
@@ -554,7 +613,7 @@ const DetalleSolicitudPage = () => {
           </div>
         </div>
 
-        {/* Timeline de estados - CORREGIDO (siempre muestra todos los pasos) */}
+        {/* Timeline de estados */}
         <div className="timeline-card">
           <h3>Seguimiento</h3>
           
@@ -571,7 +630,7 @@ const DetalleSolicitudPage = () => {
               </div>
             </div>
 
-            {/* 2. Firma Jefe de Sección - SIEMPRE SE MUESTRA */}
+            {/* 2. Aprobación del Jefe de Servicio */}
             <div className={`timeline-item ${solicitud.jefe_seccion_firmo_en ? 'completed' : solicitud.estado === 'pendiente_jefe_seccion' ? 'current' : 'pending'}`}>
               <div className="timeline-icon">
                 {solicitud.jefe_seccion_firmo_en ? <FiCheckCircle /> : <FiClock />}
@@ -619,7 +678,7 @@ const DetalleSolicitudPage = () => {
                 {solicitud.trabajo_terminado_en ? <FiCheckCircle /> : <FiClock />}
               </div>
               <div className="timeline-content">
-                <h4>5. Ejecución del Trabajo</h4>
+                <h4>5. Trabajo Realizado</h4>
                 {solicitud.trabajo_terminado_en ? (
                   <>
                     <p>{formatearFecha(solicitud.trabajo_terminado_en)}</p>
@@ -854,6 +913,56 @@ const DetalleSolicitudPage = () => {
               <button onClick={() => setMostrarModalConformidad(false)}>Cancelar</button>
               <button className="btn-success" onClick={handleDarConformidad} disabled={cargandoAccion}>
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: QR Code */}
+      {mostrarModalQr && (
+        <div className="modal-overlay" onClick={() => setMostrarModalQr(false)}>
+          <div className="modal qr-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Código QR - Solicitud #{id}</h2>
+              <button onClick={() => setMostrarModalQr(false)}><FiX /></button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', padding: '20px' }}>
+              {qrCode && (
+                <img 
+                  src={`data:image/png;base64,${qrCode}`} 
+                  alt="Código QR de la solicitud"
+                  style={{ 
+                    width: '220px', 
+                    height: '220px', 
+                    margin: '20px auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    padding: '10px'
+                  }}
+                />
+              )}
+              <p style={{ marginTop: '15px', color: '#6b7280', fontSize: '14px' }}>
+                Escanea este código QR para ver los detalles de la solicitud #{id}
+              </p>
+              <p style={{ marginTop: '5px', color: '#9ca3af', fontSize: '12px' }}>
+                Incluye: ID, título, estado, solicitante y fecha
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button 
+                className="btn-primary"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.download = `qr_solicitud_${id}.png`;
+                  link.href = `data:image/png;base64,${qrCode}`;
+                  link.click();
+                }}
+              >
+                Descargar QR
+              </button>
+              <button onClick={() => setMostrarModalQr(false)}>
+                Cerrar
               </button>
             </div>
           </div>

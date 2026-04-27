@@ -12,6 +12,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\NotificacionHelper;
 
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Color\Color;  // ← Cambiar ColorInterface por Color
+
+
 class SolicitudController extends Controller
 {
     /**
@@ -765,5 +773,398 @@ class SolicitudController extends Controller
             'message' => count($request->file('imagenes')) . ' imágenes subidas',
             'data' => ['rutas_fotos' => $rutas]
         ]);
+    }
+
+        
+    /**
+     * Generar PDF de la solicitud completada
+     *//*
+    public function generarPdf($id, Request $request)
+    {
+        $solicitud = Solicitud::with([
+            'solicitante', 'sector', 'equipo', 'tecnicoAsignado',
+            'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion'
+        ])->findOrFail($id);
+        
+        $user = $request->user();
+        
+        // Verificar permisos (solo admin, jefe soporte o solicitante)
+        if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
+            $solicitud->solicitante_id !== $user->id) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+        
+        // Generar QR con los datos de la solicitud
+        $qrData = [
+            'id' => $solicitud->id,
+            'titulo' => $solicitud->titulo,
+            'estado' => $solicitud->estado,
+            'solicitante' => $solicitud->solicitante->nombre_completo,
+            'fecha' => $solicitud->creado_en->format('d/m/Y H:i')
+        ];
+        
+        $qrCode = base64_encode(QrCode::format('png')->size(200)->generate(json_encode($qrData)));
+        
+        // Datos para el PDF
+        $data = [
+            'solicitud' => $solicitud,
+            'qrCode' => $qrCode,
+            'fechaGeneracion' => now()->format('d/m/Y H:i:s')
+        ];
+        
+        // Generar PDF
+        $pdf = Pdf::loadView('pdf.solicitud', $data);
+        $pdf->setPaper('a4', 'portrait');
+        
+        // Guardar PDF en storage
+        $pdfPath = 'solicitudes/pdf/solicitud_' . $solicitud->id . '_' . time() . '.pdf';
+        $pdfContent = $pdf->output();
+        Storage::disk('public')->put($pdfPath, $pdfContent);
+        
+        // Actualizar en la base de datos
+        $solicitud->update([
+            'pdf_generado_en' => now(),
+            'pdf_ruta' => '/storage/' . $pdfPath
+        ]);
+        
+        // Devolver el PDF para descargar
+        return $pdf->download("solicitud_{$solicitud->id}.pdf");
+    }*/
+    /**
+     * Generar PDF de la solicitud (VERSIÓN DE PRUEBA)
+     */
+    /*
+    Generar PDF de la solicitud (VERSIÓN DE PRUEBA)
+    public function generarPdf($id, Request $request)
+    {
+        try {
+            $solicitud = Solicitud::findOrFail($id);
+            
+            $user = $request->user();
+            
+            // Verificar permisos
+            if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
+                $solicitud->solicitante_id !== $user->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+            
+            // HTML simple para PDF
+            $html = "
+            <html>
+            <head>
+                <title>Solicitud #{$solicitud->id}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { color: #1e3a5f; }
+                    .info { margin-bottom: 10px; }
+                    .label { font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <h1>HOSPITAL MILITAR</h1>
+                <h2>Solicitud de Mantenimiento N° {$solicitud->id}</h2>
+                <hr>
+                <div class='info'><span class='label'>Título:</span> {$solicitud->titulo}</div>
+                <div class='info'><span class='label'>Descripción:</span> {$solicitud->descripcion}</div>
+                <div class='info'><span class='label'>Estado:</span> {$solicitud->estado}</div>
+                <div class='info'><span class='label'>Solicitante:</span> {$solicitud->solicitante->nombre_completo}</div>
+                <div class='info'><span class='label'>Fecha:</span> {$solicitud->creado_en}</div>
+                <hr>
+                <p>Documento generado el " . now()->format('d/m/Y H:i:s') . "</p>
+            </body>
+            </html>
+            ";
+            
+            $pdf = Pdf::loadHTML($html);
+            return $pdf->download("solicitud_{$solicitud->id}.pdf");
+            
+        } catch (\Exception $e) {
+            Log::error('Error PDF: ' . $e->getMessage());
+            Log::error('Line: ' . $e->getLine());
+            return response()->json([
+                'error' => 'Error al generar PDF: ' . $e->getMessage()
+            ], 500);
+        }
+    }*/
+    /**
+     * Generar PDF de la solicitud
+     */
+    public function generarPdf($id, Request $request)
+    {
+        try {
+            $solicitud = Solicitud::with([
+                'solicitante', 'sector', 'equipo', 'tecnicoAsignado'
+            ])->findOrFail($id);
+            
+            $user = $request->user();
+            
+            // Verificar permisos
+            if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
+                $solicitud->solicitante_id !== $user->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+            
+            // Formatear fechas correctamente
+            $fechaCreacion = $solicitud->creado_en ? \Carbon\Carbon::parse($solicitud->creado_en)->format('d/m/Y H:i') : 'No registrada';
+            $fechaGeneracion = now()->format('d/m/Y H:i');
+            
+            // Mapeo de estados a texto legible
+            $estados = [
+                'pendiente_solicitante' => 'Pendiente de Firma del Solicitante',
+                'pendiente_jefe_seccion' => 'Pendiente de Aprobación - Jefe de Servicio',
+                'pendiente_jefe_activos' => 'Pendiente de Autorización - Jefe de Activos',
+                'pendiente_soporte' => 'Pendiente de Asignación - Soporte Técnico',
+                'asignado' => 'Asignado a Técnico',
+                'en_proceso' => 'Trabajo en Proceso',
+                'pendiente_conformacion' => 'Pendiente de Conformidad',
+                'pendiente_jefe_mantenimiento' => 'Pendiente de Cierre - Jefe Mantenimiento',
+                'completado' => 'Completado ✅',
+                'rechazado' => 'Rechazado ❌',
+                'archivado' => 'Archivado'
+            ];
+            
+            $estadoTexto = $estados[$solicitud->estado] ?? ucfirst(str_replace('_', ' ', $solicitud->estado));
+            
+            // Determinar color del estado
+            $colorEstado = '#f59e0b'; // pendiente
+            if ($solicitud->estado === 'completado') $colorEstado = '#10b981';
+            elseif ($solicitud->estado === 'rechazado') $colorEstado = '#ef4444';
+            elseif (in_array($solicitud->estado, ['asignado', 'en_proceso'])) $colorEstado = '#3b82f6';
+            
+            // HTML con mejor formato
+            $html = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='utf-8'>
+                <title>Solicitud #{$solicitud->id}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'DejaVu Sans', 'Helvetica', 'Arial', sans-serif;
+                        font-size: 12px;
+                        line-height: 1.4;
+                        color: #333;
+                        padding: 20px;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 25px;
+                        border-bottom: 3px solid #1e3a5f;
+                        padding-bottom: 15px;
+                    }
+                    .hospital-logo {
+                        font-size: 22px;
+                        font-weight: bold;
+                        color: #1e3a5f;
+                    }
+                    .hospital-name {
+                        font-size: 14px;
+                        color: #6b7280;
+                    }
+                    .title {
+                        font-size: 18px;
+                        font-weight: bold;
+                        text-align: center;
+                        margin: 15px 0;
+                        color: #1e3a5f;
+                    }
+                    .info-section {
+                        margin-bottom: 20px;
+                        page-break-inside: avoid;
+                    }
+                    .section-title {
+                        font-size: 13px;
+                        font-weight: bold;
+                        background: #f3f4f6;
+                        padding: 6px 12px;
+                        margin-bottom: 10px;
+                        border-left: 4px solid #1e3a5f;
+                    }
+                    .info-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    .info-table td {
+                        padding: 8px;
+                        border: 1px solid #e5e7eb;
+                        vertical-align: top;
+                    }
+                    .info-label {
+                        width: 30%;
+                        font-weight: bold;
+                        background: #f9fafb;
+                    }
+                    .status-badge {
+                        display: inline-block;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        background: {$colorEstado}20;
+                        color: {$colorEstado};
+                    }
+                    .footer {
+                        text-align: center;
+                        margin-top: 30px;
+                        font-size: 10px;
+                        color: #9ca3af;
+                        border-top: 1px solid #e5e7eb;
+                        padding-top: 15px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class='header'>
+                    <div class='hospital-logo'>🏥 HOSPITAL MILITAR</div>
+                    <div class='hospital-name'>Dirección de Mantenimiento y Activos Fijos</div>
+                </div>
+
+                <div class='title'>SOLICITUD DE MANTENIMIENTO N° {$solicitud->id}</div>
+
+                <div class='info-section'>
+                    <div class='section-title'>📋 INFORMACIÓN GENERAL</div>
+                    <table class='info-table'>
+                        <tr>
+                            <td class='info-label'>Título:</td>
+                            <td>{$solicitud->titulo}</td>
+                        </tr>
+                        <tr>
+                            <td class='info-label'>Estado:</td>
+                            <td><span class='status-badge'>{$estadoTexto}</span></td>
+                        </tr>
+                        <tr>
+                            <td class='info-label'>Tipo:</td>
+                            <td>" . ($solicitud->tipo_solicitud === 'sin_material' ? 'Sin Material' : 'Con Material') . "</td>
+                        </tr>
+                        <tr>
+                            <td class='info-label'>Fecha de Creación:</td>
+                            <td>{$fechaCreacion}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class='info-section'>
+                    <div class='section-title'>👤 SOLICITANTE</div>
+                    <table class='info-table'>
+                        <tr>
+                            <td class='info-label'>Nombre:</td>
+                            <td>{$solicitud->solicitante->nombre_completo}</td>
+                        </tr>
+                        <tr>
+                            <td class='info-label'>Grado:</td>
+                            <td>" . ($solicitud->solicitante->grado ?? 'N/A') . "</td>
+                        </tr>
+                        <tr>
+                            <td class='info-label'>Sector:</td>
+                            <td>" . ($solicitud->sector->nombre ?? 'N/A') . "</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class='info-section'>
+                    <div class='section-title'>🔧 EQUIPO</div>
+                    <table class='info-table'>
+                        <tr>
+                            <td class='info-label'>Equipo:</td>
+                            <td>" . ($solicitud->equipo->nombre ?? 'No especificado') . "</td>
+                        </tr>
+                        " . ($solicitud->equipo ? "
+                        <tr>
+                            <td class='info-label'>Código:</td>
+                            <td>" . ($solicitud->equipo->codigo_equipo ?? 'N/A') . "</td>
+                        </tr>
+                        " : "") . "
+                    </table>
+                </div>
+
+                <div class='info-section'>
+                    <div class='section-title'>📝 DESCRIPCIÓN DEL PROBLEMA</div>
+                    <table class='info-table'>
+                        <tr>
+                            <td class='info-value' style='padding: 12px;'>{$solicitud->descripcion}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class='footer'>
+                    Documento generado electrónicamente el {$fechaGeneracion}<br>
+                    Hospital Militar - Sistema de Gestión de Mantenimiento
+                </div>
+            </body>
+            </html>
+            ";
+            
+            $pdf = Pdf::loadHTML($html);
+            $pdf->setPaper('a4', 'portrait');
+            return $pdf->download("solicitud_{$solicitud->id}.pdf");
+            
+        } catch (\Exception $e) {
+            Log::error('Error PDF: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Error al generar PDF: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener QR de la solicitud (Versión corregida)
+     */
+    public function obtenerQr($id, Request $request)
+    {
+        try {
+            $solicitud = Solicitud::findOrFail($id);
+            
+            $user = $request->user();
+            
+            // Verificar permisos
+            if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
+                $solicitud->solicitante_id !== $user->id) {
+                return response()->json(['success' => false, 'message' => 'No autorizado'], 403);
+            }
+            
+            // Generar URL pública para la solicitud
+            $url = url("/solicitudes/{$solicitud->id}");
+            
+            // Texto completo del QR
+            $qrText = "=== SOLICITUD DE MANTENIMIENTO ===\n";
+            $qrText .= "URL: {$url}\n";
+            $qrText .= "ID: {$solicitud->id}\n";
+            $qrText .= "Título: {$solicitud->titulo}\n";
+            $qrText .= "Estado: " . str_replace('_', ' ', $solicitud->estado) . "\n";
+            $qrText .= "Solicitante: {$solicitud->solicitante->nombre_completo}\n";
+            $qrText .= "Fecha: " . $solicitud->creado_en->format('d/m/Y H:i') . "\n";
+            $qrText .= "\n--- Escanea para ver detalles ---";
+            
+            // Generar QR con colores correctos
+            $qrCode = QrCode::create($qrText)
+                ->setSize(350)
+                ->setMargin(10)
+                ->setForegroundColor(new Color(0, 0, 0))      // Negro
+                ->setBackgroundColor(new Color(255, 255, 255)); // Blanco
+            
+            $writer = new PngWriter();
+            $result = $writer->write($qrCode);
+            $qrCodeBase64 = base64_encode($result->getString());
+            
+            return response()->json([
+                'success' => true,
+                'qr_code' => $qrCodeBase64,
+                'solicitud_id' => $solicitud->id,
+                'url' => $url
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error QR: ' . $e->getMessage());
+            
+            // Fallback: solo URL
+            $url = url("/solicitudes/{$id}");
+            return response()->json([
+                'success' => true,
+                'qr_code' => base64_encode($url),
+                'solicitud_id' => $id,
+                'warning' => 'QR simplificado'
+            ]);
+        }
     }
 }

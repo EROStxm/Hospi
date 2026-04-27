@@ -87,5 +87,20 @@ export const solicitudService = {
   usarMaterial: async (id, materiales) => {
     const response = await api.post(`/solicitudes/${id}/usar-material`, { materiales });
     return response.data;
+  },
+
+  // Generar PDF
+  async generarPdf(id) {
+      const response = await api.get(`/solicitudes/${id}/pdf`, {
+          responseType: 'blob' // Importante para descargar archivo
+      });
+      return response;
+  },
+
+  // Obtener QR
+  async obtenerQr(id) {
+      const response = await api.get(`/solicitudes/${id}/qr`);
+      return response.data;
   }
+  
 };

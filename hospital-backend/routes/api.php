@@ -21,7 +21,12 @@ use Illuminate\Support\Facades\Route;
 // Rutas públicas
 Route::get('/ping', [PingController::class, 'ping']);
 Route::post('/login', [AuthController::class, 'login']);
-
+Route::get('/test-time', function() {
+    return response()->json([
+        'now' => now()->format('Y-m-d H:i:s'),
+        'timezone' => config('app.timezone')
+    ]);
+});
 // Rutas protegidas por Sanctum
 Route::middleware('auth:sanctum')->group(function () {
     
@@ -56,6 +61,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Subir imágenes
     Route::post('/solicitudes/{id}/upload-imagenes', [SolicitudController::class, 'uploadImagenes']);
+
+    // Dentro de auth:sanctum, después de las rutas de solicitudes
+    Route::get('/solicitudes/{id}/pdf', [SolicitudController::class, 'generarPdf']);
+    Route::get('/solicitudes/{id}/qr', [SolicitudController::class, 'obtenerQr']);
     
     // =============================================
     // RUTAS PARA SOPORTE TÉCNICO Y JEFE SOPORTE
@@ -136,5 +145,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
     Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
+    
     
 });
