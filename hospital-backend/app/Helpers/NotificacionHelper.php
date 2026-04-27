@@ -4,7 +4,7 @@ namespace App\Helpers;
 
 use App\Models\Notificacion;
 use App\Models\User;
-// app/Helpers/NotificacionHelper.php
+
 class NotificacionHelper
 {
     /**
@@ -17,9 +17,8 @@ class NotificacionHelper
             'titulo' => $titulo,
             'mensaje' => $mensaje,
             'tipo' => $tipo, // 'info', 'success', 'warning', 'danger'
-            'url' => $url,
             'solicitud_id' => $solicitudId,
-            'leida' => false,
+            'enviado_via' => 'web',
             'creado_en' => now()
         ]);
     }

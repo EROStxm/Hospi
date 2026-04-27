@@ -9,8 +9,6 @@ class Notificacion extends Model
     protected $table = 'notificaciones';
     public $timestamps = false;
     
-    const CREATED_AT = 'creado_en';
-
     protected $fillable = [
         'usuario_id',
         'tipo',
@@ -20,12 +18,19 @@ class Notificacion extends Model
         'leido_en',
         'enviado_via',
         'id_externo',
+        'creado_en'
     ];
 
     protected $casts = [
         'leido_en' => 'datetime',
-        'creado_en' => 'datetime',
+        'creado_en' => 'datetime'
     ];
+
+    // Accessor para saber si está leída
+    public function getLeidaAttribute()
+    {
+        return !is_null($this->leido_en);
+    }
 
     public function usuario()
     {

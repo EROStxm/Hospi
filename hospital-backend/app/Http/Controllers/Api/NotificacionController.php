@@ -17,12 +17,22 @@ class NotificacionController extends Controller
         $query = Notificacion::where('usuario_id', Auth::id())
             ->orderBy('creado_en', 'desc');
         
-        // Filtrar por estado de lectura
+        // Filtrar por estado de lectura (usando leido_en)
         if ($request->has('leida')) {
-            $query->where('leida', $request->leida === 'true');
+            if ($request->leida === 'true') {
+                $query->whereNotNull('leido_en');
+            } elseif ($request->leida === 'false') {
+                $query->whereNull('leido_en');
+            }
         }
         
         $notificaciones = $query->paginate($request->get('per_page', 20));
+        
+        // Transformar para agregar campo 'leida' virtual
+        $notificaciones->getCollection()->transform(function ($item) {
+            $item->leida = !is_null($item->leido_en);
+            return $item;
+        });
         
         return response()->json([
             'success' => true,
@@ -36,7 +46,7 @@ class NotificacionController extends Controller
     public function conteoNoLeidas()
     {
         $conteo = Notificacion::where('usuario_id', Auth::id())
-            ->where('leida', false)
+            ->whereNull('leido_en')
             ->count();
         
         return response()->json([
@@ -54,7 +64,7 @@ class NotificacionController extends Controller
             ->where('id', $id)
             ->firstOrFail();
         
-        $notificacion->update(['leida' => true]);
+        $notificacion->update(['leido_en' => now()]);
         
         return response()->json([
             'success' => true,
@@ -68,8 +78,8 @@ class NotificacionController extends Controller
     public function marcarTodasLeidas()
     {
         Notificacion::where('usuario_id', Auth::id())
-            ->where('leida', false)
-            ->update(['leida' => true]);
+            ->whereNull('leido_en')
+            ->update(['leido_en' => now()]);
         
         return response()->json([
             'success' => true,

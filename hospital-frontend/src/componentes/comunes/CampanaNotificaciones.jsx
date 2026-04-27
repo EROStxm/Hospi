@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-// Importación correcta para React 19
-//src/componentes/comunes/CampanaNotificaciones.jsx
-import { FiBell, FiCheck, FiCheckCircle, FiTrash2, FiX } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiTrash2, FiX } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -24,7 +22,9 @@ const CampanaNotificaciones = () => {
     }, []);
 
     useEffect(() => {
-        if (isOpen) cargarNotificaciones();
+        if (isOpen) {
+            cargarNotificaciones();
+        }
     }, [isOpen]);
 
     useEffect(() => {
@@ -36,6 +36,17 @@ const CampanaNotificaciones = () => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Escuchar eventos de actualización
+    useEffect(() => {
+        const handleRecargar = () => {
+            cargarConteo();
+            if (isOpen) cargarNotificaciones();
+        };
+
+        window.addEventListener('recargar-notificaciones', handleRecargar);
+        return () => window.removeEventListener('recargar-notificaciones', handleRecargar);
+    }, [isOpen]);
 
     const cargarConteo = async () => {
         try {
@@ -49,8 +60,16 @@ const CampanaNotificaciones = () => {
     const cargarNotificaciones = async () => {
         setCargando(true);
         try {
-            const response = await notificacionService.obtenerNotificaciones(1);
-            setNotificaciones(response.data.data || []);
+            const response = await notificacionService.obtenerNotificaciones(1, false);
+            const notificacionesData = response.data.data || [];
+            
+            // Asegurar que cada notificación tenga el campo 'leida'
+            const notificacionesConLeida = notificacionesData.map(n => ({
+                ...n,
+                leida: n.leido_en !== null
+            }));
+            
+            setNotificaciones(notificacionesConLeida);
         } catch (error) {
             console.error('Error cargando notificaciones:', error);
         } finally {
@@ -62,10 +81,11 @@ const CampanaNotificaciones = () => {
         if (!notificacion.leida) {
             try {
                 await notificacionService.marcarLeida(notificacion.id);
-                setNoLeidas(prev => Math.max(0, prev - 1));
+                // Actualizar estado local
                 setNotificaciones(prev =>
-                    prev.map(n => n.id === notificacion.id ? { ...n, leida: true } : n)
+                    prev.map(n => n.id === notificacion.id ? { ...n, leida: true, leido_en: new Date().toISOString() } : n)
                 );
+                setNoLeidas(prev => Math.max(0, prev - 1));
             } catch (error) {
                 console.error('Error marcando como leída:', error);
             }
@@ -80,8 +100,8 @@ const CampanaNotificaciones = () => {
     const handleMarcarTodasLeidas = async () => {
         try {
             await notificacionService.marcarTodasLeidas();
+            setNotificaciones(prev => prev.map(n => ({ ...n, leida: true, leido_en: new Date().toISOString() })));
             setNoLeidas(0);
-            setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
             toast.success('Todas las notificaciones marcadas como leídas');
         } catch (error) {
             toast.error('Error al marcar notificaciones');
@@ -93,10 +113,13 @@ const CampanaNotificaciones = () => {
         try {
             const notif = notificaciones.find(n => n.id === id);
             await notificacionService.eliminarNotificacion(id);
+            
             setNotificaciones(prev => prev.filter(n => n.id !== id));
+            
             if (notif && !notif.leida) {
                 setNoLeidas(prev => Math.max(0, prev - 1));
             }
+            
             toast.success('Notificación eliminada');
         } catch (error) {
             toast.error('Error al eliminar notificación');
