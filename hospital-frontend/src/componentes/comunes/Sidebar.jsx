@@ -47,6 +47,7 @@ const Sidebar = ({ usuario, isOpen, onClose }) => {
       items.push({ path: '/materiales', icon: '📦', label: 'Materiales' });
       items.push({ path: '/sectores', icon: '🏥', label: 'Sectores' });
       items.push({ path: '/ubicaciones', icon: '📍', label: 'Ubicaciones' }); // NUEVO
+      items.push({ path: '/huellas', icon: '🖐️', label: 'Huellas Digitales' }); // 🆕 AGREGAR
     }
     
     return items;

@@ -21,6 +21,8 @@ import SolicitudesSectorPage from './paginas/SolicitudesSectorPage';
 import NotificacionesPage from './paginas/NotificacionesPage';
 import './estilos/global.css';
 
+import HuellasPage from './paginas/HuellasPage';
+
 function AppContent() {
   const [autenticado, setAutenticado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -297,6 +299,18 @@ function AppContent() {
           )
         } 
       />
+      
+      <Route 
+        path="/huellas" 
+        element={
+          autenticado && usuario?.rol?.nombre === 'admin_sistema' ? (
+            <ProtectedLayout>
+              <HuellasPage />
+            </ProtectedLayout>
+          ) : <Navigate to="/dashboard" replace />
+        } 
+      />
+
 
       <Route 
         path="/" 

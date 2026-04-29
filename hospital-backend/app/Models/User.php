@@ -109,4 +109,26 @@ class User extends Authenticatable
     {
         return $this->rol ? $this->rol->nombre : null;
     }
+
+    // Métodos para huella
+    public function hasHuella()
+    {
+        return !is_null($this->huella);
+    }
+
+    public function registrarHuella($templateData)
+    {
+        $this->update([
+            'huella' => $templateData,
+            'huella_registrada_en' => now()
+        ]);
+    }
+
+    public function eliminarHuella()
+    {
+        $this->update([
+            'huella' => null,
+            'huella_registrada_en' => null
+        ]);
+    }
 }

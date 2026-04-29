@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PingController;
 use App\Http\Controllers\Api\UbicacionController;
 use App\Http\Controllers\Api\NotificacionController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\HuellaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -146,5 +147,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
     Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
     
+    //rutas para huella dactilar
+    Route::post('/huellas/registrar', [HuellaController::class, 'registrar']);
+    Route::post('/huellas/eliminar/{id}', [HuellaController::class, 'eliminar']);
+    Route::get('/huellas/usuarios', [HuellaController::class, 'listarConHuella']);
+    
     
 });
+// Login con huella (público)
+Route::post('/login-huella', [HuellaController::class, 'verificar']);
