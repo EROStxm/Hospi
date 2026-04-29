@@ -1,6 +1,7 @@
 // URL de la API
 //export const API_URL = 'http://localhost:8000/api';
 //export const API_URL = 'http://192.168.0.10:8000/api';
+//export const API_URL = 'http://10.144.66.211:8000/api';
 
 // src/utiles/constantes.js
 
@@ -13,12 +14,12 @@ const getApiUrl = () => {
     // Si accedemos desde un celular (IP de la red local)
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
       // Usar la IP del servidor (tu PC)
-      return 'http://192.168.0.10:8000/api';
+      return 'http://10.144.66.211:8000/api';
     }
   }
   
   // Si estamos en la PC
-  return 'http://192.168.0.10:8000/api';
+  return 'http://10.144.66.211:8000/api';
 };
 
 export const API_URL = getApiUrl();

@@ -9,12 +9,12 @@ class MqttService {
 
   connect() {
     const options = {
-      host: '192.168.0.10',
+      host: '10.144.66.211',
       port: 8083,  // Puerto WebSocket de Mosquitto
       protocol: 'ws'
     };
     
-    this.client = mqtt.connect('ws://192.168.0.10:8083');
+    this.client = mqtt.connect('ws://10.144.66.211:8083');
     
     this.client.on('connect', () => {
       console.log('✅ Conectado a MQTT via WebSocket');

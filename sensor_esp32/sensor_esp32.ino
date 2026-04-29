@@ -8,7 +8,8 @@ const char* ssid = "OEEM1";
 const char* password = "4919044OEEM";
 
 // ========== CONFIGURACIÓN MQTT ==========
-const char* mqtt_server = "192.168.0.10";
+//const char* mqtt_server = "192.168.0.10";
+const char* mqtt_server = "10.144.66.211";
 const int mqtt_port = 1883;
 const char* mqtt_topic_huellas = "hospital/huellas";
 const char* mqtt_topic_comandos = "hospital/comandos";

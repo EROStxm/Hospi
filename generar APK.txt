@@ -1,0 +1,8 @@
+# Instalar Expo CLI globalmente
+npm install -g expo-cli
+
+# Construir APK para Android
+npx expo build:android
+
+# O para desarrollo rápido (necesita app Expo Go)
+npx expo start

@@ -900,7 +900,7 @@ class SolicitudController extends Controller
             $user = $request->user();
 
             // ===== PERMISOS =====
-            if (
+            /*if (
                 !in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) &&
                 $solicitud->solicitante_id !== $user->id
             ) {
@@ -908,7 +908,7 @@ class SolicitudController extends Controller
                     'success' => false,
                     'message' => 'No autorizado'
                 ], 403);
-            }
+            }*/
 
             // ===== GENERAR QR =====
             $qrText = "Solicitud #{$solicitud->id}\n";
@@ -978,11 +978,11 @@ class SolicitudController extends Controller
             
             $user = $request->user();
             
-            // Verificar permisos
+            /*// Verificar permisos
             if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
                 $solicitud->solicitante_id !== $user->id) {
                 return response()->json(['success' => false, 'message' => 'No autorizado'], 403);
-            }
+            }*/
             
             // Generar URL pública para la solicitud
             $url = url("/solicitudes/{$solicitud->id}");
