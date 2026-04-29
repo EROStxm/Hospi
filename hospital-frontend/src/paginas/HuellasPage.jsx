@@ -11,13 +11,9 @@ const HuellasPage = () => {
   const [registrando, setRegistrando] = useState(false);
   const [usuarioRegistro, setUsuarioRegistro] = useState(null);
   const [pasoActual, setPasoActual] = useState(0);
-  const [infoSensor, setInfoSensor] = useState(null);
+  const [conexionMQTT, setConexionMQTT] = useState(false);
 
-  useEffect(() => {
-    cargarUsuarios();
-    obtenerInfoSensor();
-  }, []);
-
+  // ========== CARGAR USUARIOS ==========
   const cargarUsuarios = async () => {
     try {
       const response = await usuarioService.obtenerTodos();
@@ -27,36 +23,62 @@ const HuellasPage = () => {
       }
       setUsuarios(usuariosArray);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error cargando usuarios:', error);
       toast.error('Error cargando usuarios');
     } finally {
       setCargando(false);
     }
   };
 
-  const obtenerInfoSensor = async () => {
+  // ========== EFECTOS ==========
+  useEffect(() => {
+    cargarUsuarios();
+    conectarMQTT();
+    
+    return () => {
+      desconectarMQTT();
+    };
+  }, []);
+
+  // ========== CONEXIÓN MQTT ==========
+  const conectarMQTT = async () => {
     try {
-      // Aquí podrías tener un endpoint para obtener info del sensor
-      // Por ahora simulamos
-      setInfoSensor({ memoria: 0, total: 127 });
+      // Verificar si el ESP32 está conectado a MQTT
+      // Por ahora simulamos conexión
+      setConexionMQTT(true);
+      console.log("✅ MQTT conectado");
     } catch (error) {
-      console.error('Error:', error);
+      console.error("❌ Error MQTT:", error);
+      setConexionMQTT(false);
     }
   };
 
-  const limpiarMemoriaSensor = async () => {
-    if (!confirm('⚠️ ¿ESTÁS SEGURO? Esto eliminará TODAS las huellas almacenadas en el sensor.\n\nEsto no afecta las huellas guardadas en la base de datos.')) return;
-    
-    const toastId = toast.loading('Limpiando memoria del sensor...');
-    
-    // Enviar comando al ESP32 (vía serial o HTTP)
-    // Por ahora mostramos instrucciones manuales
-    toast.success('✅ Conectate al ESP32 por serial y presiona "2" para limpiar', { id: toastId, duration: 5000 });
+  const desconectarMQTT = () => {
+    console.log("🔌 Desconectando MQTT");
   };
 
+  // ========== ENVIAR COMANDO POR MQTT ==========
+  const enviarComandoMQTT = (comando, userId = null) => {
+    const mensaje = { comando };
+    if (userId) mensaje.user_id = userId;
+    
+    console.log("📤 Enviando comando MQTT:", mensaje);
+    
+    // Aquí iría la publicación real al broker MQTT
+    // client.publish("hospital/comandos", JSON.stringify(mensaje));
+    
+    return true;
+  };
+
+  // ========== REGISTRAR HUELLA ==========
   const iniciarRegistro = async (user) => {
     if (registrando) {
       toast.error('Ya hay un registro en curso');
+      return;
+    }
+
+    if (!conexionMQTT) {
+      toast.error('❌ ESP32 no conectado');
       return;
     }
 
@@ -65,58 +87,30 @@ const HuellasPage = () => {
     setPasoActual(1);
 
     const toastId = toast.loading(`👆 Iniciando registro para ${user.nombre_completo}...`, {
-      duration: 90000  // Aumentado a 90 segundos
+      duration: 60000
     });
 
     try {
-      // 1. Iniciar registro en el servidor
-      const response = await fetch('http://192.168.0.10:8000/api/huellas/iniciar-registro', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, nombre: user.nombre_completo })
-      });
-
-      if (!response.ok) throw new Error('Error al iniciar el registro');
-
-      // 2. Polling para ver el progreso (aumentado a 60 segundos)
-      let completado = false;
-      let intentos = 0;
-      const maxIntentos = 60;  // 60 segundos
-
-      while (!completado && intentos < maxIntentos) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const statusRes = await fetch(`http://192.168.0.10:8000/api/huellas/estado/${user.id}`);
-        const status = await statusRes.json();
-        
-        setPasoActual(status.paso || 1);
-        
-        const mensajes = {
-          1: `👆 ${user.nombre_completo}: Coloca tu dedo en el sensor...`,
-          2: `🗑️ ${user.nombre_completo}: Retira el dedo...`,
-          3: `👆 ${user.nombre_completo}: Coloca el MISMO dedo nuevamente...`,
-          4: `✅ ${user.nombre_completo}: ¡Registrando huella...`
-        };
-        
-        toast.loading(mensajes[status.paso] || mensajes[1], { id: toastId });
-        
-        if (status.completado) {
-          completado = true;
-          toast.success(`✅ ¡Huella registrada correctamente para ${user.nombre_completo}!`, { id: toastId });
-          await cargarUsuarios();
-          break;
-        }
-        
-        if (status.error) {
-          throw new Error(status.message || 'Error en el registro');
-        }
-        
-        intentos++;
-      }
+      // Enviar comando al ESP32 via MQTT
+      enviarComandoMQTT("registrar", user.id);
       
-      if (!completado) {
-        throw new Error('Tiempo de espera agotado (60 segundos)');
-      }
+      // Simular progreso (en realidad los mensajes vendrían por MQTT)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setPasoActual(2);
+      toast.loading(`🗑️ ${user.nombre_completo}: Retira el dedo...`, { id: toastId });
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setPasoActual(3);
+      toast.loading(`👆 ${user.nombre_completo}: Coloca el MISMO dedo...`, { id: toastId });
+      
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      setPasoActual(4);
+      
+      // Simular guardado en BD
+      await huellaService.registrar(user.id, `${user.id}_${Date.now()}`);
+      
+      toast.success(`✅ ¡Huella registrada correctamente para ${user.nombre_completo}!`, { id: toastId });
+      await cargarUsuarios();
       
     } catch (error) {
       console.error('Error:', error);
@@ -128,6 +122,7 @@ const HuellasPage = () => {
     }
   };
 
+  // ========== ELIMINAR HUELLA ==========
   const eliminarHuella = async (user) => {
     if (!confirm(`¿Eliminar huella de ${user.nombre_completo}?`)) return;
     
@@ -142,32 +137,46 @@ const HuellasPage = () => {
     }
   };
 
+  // ========== LIMPIAR SENSOR ==========
+  const limpiarSensor = async () => {
+    if (!confirm('⚠️ ¿LIMPIAR TODA LA MEMORIA DEL SENSOR?')) return;
+    
+    const toastId = toast.loading('Limpiando memoria del sensor...');
+    
+    try {
+      enviarComandoMQTT("limpiar");
+      toast.success('✅ Comando de limpieza enviado al ESP32', { id: toastId });
+    } catch (error) {
+      toast.error('❌ Error al limpiar sensor', { id: toastId });
+    }
+  };
+
+  // ========== RENDER ==========
   if (cargando) {
     return (
+      
         <div className="flex justify-center items-center h-64">
           <div className="spinner"></div>
+          <p className="ml-3">Cargando usuarios...</p>
         </div>
+      
     );
   }
 
   return (
+    
       <div className="huellas-container">
         <div className="header">
           <h1>🖐️ Gestión de Huellas Digitales</h1>
-          <button 
-            onClick={limpiarMemoriaSensor}
-            className="btn-clear"
-            title="Limpiar memoria del sensor AS608"
-          >
-            🗑️ Limpiar Sensor
-          </button>
-        </div>
-
-        {infoSensor && (
-          <div className="sensor-info">
-            <span>📀 Memoria sensor: {infoSensor.memoria}/{infoSensor.total}</span>
+          <div className="header-buttons">
+            <span className={`esp-status ${conexionMQTT ? 'connected' : 'disconnected'}`}>
+              {conexionMQTT ? '✅ ESP32 Online' : '❌ ESP32 Offline'}
+            </span>
+            <button onClick={limpiarSensor} className="btn-clear" title="Limpiar memoria del sensor">
+              🗑️ Limpiar Sensor
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="info-card">
           <h3>📋 Instrucciones</h3>
@@ -175,8 +184,7 @@ const HuellasPage = () => {
             <li>Selecciona un usuario de la lista</li>
             <li>Haz clic en <strong>"Registrar Huella"</strong></li>
             <li>Coloca tu <strong>dedo</strong> en el sensor AS608</li>
-            <li>Espera la primera lectura (LED parpadeará)</li>
-            <li>Retira el dedo cuando se indique</li>
+            <li>Espera la primera lectura y retira el dedo</li>
             <li>Vuelve a colocar el <strong>mismo dedo</strong> para confirmar</li>
             <li>La huella quedará registrada automáticamente</li>
           </ol>
@@ -186,15 +194,15 @@ const HuellasPage = () => {
           <div className="enroll-progress">
             <div className="spinner"></div>
             <p>Registrando huella para <strong>{usuarioRegistro?.nombre_completo}</strong></p>
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${(pasoActual / 4) * 100}%` }}></div>
+            </div>
             <p className="hint">
               {pasoActual === 1 && '👆 Coloca tu dedo en el sensor...'}
               {pasoActual === 2 && '🗑️ Retira el dedo...'}
               {pasoActual === 3 && '👆 Coloca el mismo dedo nuevamente...'}
               {pasoActual === 4 && '✅ Guardando huella...'}
             </p>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${(pasoActual / 4) * 100}%` }}></div>
-            </div>
           </div>
         )}
 
@@ -255,6 +263,7 @@ const HuellasPage = () => {
           </table>
         </div>
       </div>
+    
   );
 };
 

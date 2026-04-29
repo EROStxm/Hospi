@@ -1,12 +1,17 @@
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_Fingerprint.h>
 
-// ========== CONFIGURACIÓN ==========
+// ========== CONFIGURACIÓN WiFi ==========
 const char* ssid = "OEEM1";
 const char* password = "4919044OEEM";
-const char* serverUrl = "http://192.168.0.10:8000/api";
+
+// ========== CONFIGURACIÓN MQTT ==========
+const char* mqtt_server = "192.168.0.10";
+const int mqtt_port = 1883;
+const char* mqtt_topic_huellas = "hospital/huellas";
+const char* mqtt_topic_comandos = "hospital/comandos";
 
 // ========== PINES ==========
 #define RX_PIN      16
@@ -16,9 +21,13 @@ const char* serverUrl = "http://192.168.0.10:8000/api";
 
 HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 int currentUserId = 0;
 bool registrando = false;
+int pasoActual = 0;
+unsigned long lastReconnectAttempt = 0;
 
 // ========== SETUP ==========
 void setup() {
@@ -26,25 +35,22 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   pinMode(TOUCH_PIN, INPUT_PULLUP);
   
-  Serial.println("\n=== SISTEMA DE HUELLAS HOSPITAL ===");
+  Serial.println("\n=== SISTEMA DE HUELLAS CON MQTT ===");
   
   // Conectar WiFi
   WiFi.begin(ssid, password);
   Serial.print("Conectando WiFi");
-  int intentos = 0;
-  while (WiFi.status() != WL_CONNECTED && intentos < 20) {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    intentos++;
   }
+  Serial.println("\n✅ WiFi conectado!");
+  Serial.print("📡 IP: ");
+  Serial.println(WiFi.localIP());
   
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ WiFi conectado!");
-    Serial.print("📡 IP del ESP32: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n❌ Error de WiFi");
-  }
+  // Configurar MQTT
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
   
   // Inicializar sensor
   mySerial.begin(57600, SERIAL_8N1, RX_PIN, TX_PIN);
@@ -56,21 +62,75 @@ void setup() {
     Serial.println("❌ Sensor no encontrado!");
   }
   
-  // Mostrar información de memoria del sensor
   mostrarInfoSensor();
-  
-  Serial.println("\n📌 ESP32 LISTO");
-  Serial.println("Comandos disponibles:");
-  Serial.println("  '1' - Registrar huella (manual)");
-  Serial.println("  '2' - Limpiar memoria del sensor");
-  Serial.println("  '3' - Ver información del sensor");
+  Serial.println("\n📌 ESP32 LISTO - Esperando conexión MQTT...");
 }
 
-// ========== MOSTRAR INFO DEL SENSOR ==========
-void mostrarInfoSensor() {
-  Serial.println("\n=== INFO SENSOR ===");
+// ========== CALLBACK MQTT (recibe comandos) ==========
+void callback(char* topic, byte* payload, unsigned int length) {
+  String mensaje = "";
+  for (int i = 0; i < length; i++) {
+    mensaje += (char)payload[i];
+  }
   
-  // Obtener número de huellas registradas
+  Serial.print("📨 Comando MQTT recibido: ");
+  Serial.println(mensaje);
+  
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, mensaje);
+  
+  if (!error) {
+    String comando = doc["comando"];
+    
+    if (comando == "registrar") {
+      currentUserId = doc["user_id"];
+      registrando = true;
+      
+      Serial.print("📝 Registrando usuario ID: ");
+      Serial.println(currentUserId);
+      
+      // Iniciar registro en función separada
+      capturarHuella(currentUserId);
+      registrando = false;
+    }
+    else if (comando == "limpiar") {
+      limpiarMemoriaSensor();
+    }
+    else if (comando == "info") {
+      mostrarInfoSensor();
+      publicarInfoSensor();
+    }
+  }
+}
+
+// ========== PUBLICAR ESTADO ==========
+void publicarEstado(int paso, String mensaje) {
+  StaticJsonDocument<200> doc;
+  doc["tipo"] = "estado";
+  doc["paso"] = paso;
+  doc["mensaje"] = mensaje;
+  doc["user_id"] = currentUserId;
+  
+  if (paso == 4) {
+    doc["completado"] = true;
+    doc["template"] = String(currentUserId) + "_" + String(millis());
+  }
+  
+  String output;
+  serializeJson(doc, output);
+  
+  if (client.connected()) {
+    client.publish(mqtt_topic_huellas, output.c_str());
+  }
+  
+  Serial.print("📤 Estado publicado: Paso ");
+  Serial.print(paso);
+  Serial.print(" - ");
+  Serial.println(mensaje);
+}
+
+// ========== PUBLICAR INFO ==========
+void publicarInfoSensor() {
   uint8_t count = 0;
   for (int i = 0; i < 127; i++) {
     if (finger.loadModel(i) == FINGERPRINT_OK) {
@@ -78,68 +138,50 @@ void mostrarInfoSensor() {
     }
   }
   
-  Serial.print("📀 Huellas en memoria del sensor: ");
-  Serial.print(count);
-  Serial.println(" / 127");
+  StaticJsonDocument<200> doc;
+  doc["tipo"] = "info";
+  doc["huellas_memoria"] = count;
+  doc["capacidad_maxima"] = 127;
   
-  if (count > 0) {
-    Serial.print("⚠️ Memoria del sensor al ");
-    Serial.print((count * 100 / 127));
-    Serial.println("% de capacidad");
-  }
+  String output;
+  serializeJson(doc, output);
+  client.publish(mqtt_topic_huellas, output.c_str());
 }
 
-// ========== LIMPIAR MEMORIA DEL SENSOR ==========
+// ========== MOSTRAR INFO ==========
+void mostrarInfoSensor() {
+  uint8_t count = 0;
+  for (int i = 0; i < 127; i++) {
+    if (finger.loadModel(i) == FINGERPRINT_OK) {
+      count++;
+    }
+  }
+  
+  Serial.print("📀 Huellas en memoria: ");
+  Serial.print(count);
+  Serial.println(" / 127");
+}
+
+// ========== LIMPIAR MEMORIA ==========
 void limpiarMemoriaSensor() {
-  Serial.println("\n🗑️ LIMPIANDO MEMORIA DEL SENSOR...");
+  Serial.println("\n🗑️ LIMPIANDO MEMORIA...");
   
   uint8_t eliminadas = 0;
   for (int i = 0; i < 127; i++) {
     if (finger.deleteModel(i) == FINGERPRINT_OK) {
       eliminadas++;
-      Serial.print(".");
     }
     delay(10);
   }
   
-  Serial.println("\n✅ Memoria limpiada!");
-  Serial.print("Se eliminaron ");
-  Serial.print(eliminadas);
-  Serial.println(" huellas");
+  Serial.print("✅ Eliminadas: ");
+  Serial.println(eliminadas);
+  mostrarInfoSensor();
+  publicarInfoSensor();
   
   digitalWrite(LED_PIN, HIGH);
   delay(500);
   digitalWrite(LED_PIN, LOW);
-  
-  mostrarInfoSensor();
-}
-
-// ========== ACTUALIZAR ESTADO EN EL SERVIDOR ==========
-void actualizarEstado(int userId, int paso, bool completado, String templateData) {
-  if (WiFi.status() != WL_CONNECTED) return;
-  
-  HTTPClient http;
-  String url = String(serverUrl) + "/huellas/actualizar-estado";
-  
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  http.setTimeout(10000);
-  
-  StaticJsonDocument<256> doc;
-  doc["user_id"] = userId;
-  doc["paso"] = paso;
-  doc["completado"] = completado;
-  doc["template"] = templateData;
-  doc["error"] = false;
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  
-  int httpCode = http.POST(jsonString);
-  http.end();
-  
-  Serial.print("📡 Estado actualizado: Paso ");
-  Serial.println(paso);
 }
 
 // ========== CAPTURAR HUELLA ==========
@@ -148,17 +190,15 @@ bool capturarHuella(int userId) {
   Serial.println("👆 REGISTRO DE HUELLA");
   Serial.print("Usuario ID: ");
   Serial.println(userId);
-  Serial.println("=========================================");
   
-  actualizarEstado(userId, 1, false, "");
+  publicarEstado(1, "Coloca tu dedo en el sensor...");
+  digitalWrite(LED_PIN, HIGH);
   
-  // Esperar dedo con timeout más largo
-  Serial.println("1️⃣ Coloca tu DEDO en el sensor...");
   uint8_t p = -1;
   int timeout = 0;
-  const int maxTimeout = 60; // 60 segundos máximo
   
-  while (p != FINGERPRINT_OK && timeout < maxTimeout) {
+  Serial.println("1️⃣ Coloca tu DEDO en el sensor...");
+  while (p != FINGERPRINT_OK && timeout < 60) {
     p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) {
       if (timeout % 10 == 0) Serial.print(".");
@@ -170,32 +210,27 @@ bool capturarHuella(int userId) {
   }
   
   if (p != FINGERPRINT_OK) {
-    Serial.println("\n❌ Timeout: No se detectó dedo");
-    actualizarEstado(userId, 1, false, "error");
+    Serial.println("\n❌ Timeout");
+    publicarEstado(1, "Error: Timeout");
+    digitalWrite(LED_PIN, LOW);
     return false;
   }
   
   p = finger.image2Tz(1);
-  if (p != FINGERPRINT_OK) {
-    Serial.println("❌ Error al procesar imagen");
-    return false;
-  }
+  if (p != FINGERPRINT_OK) return false;
   
+  publicarEstado(2, "Retira el dedo...");
   Serial.println("2️⃣ RETIRA el dedo...");
-  actualizarEstado(userId, 2, false, "");
   delay(2000);
   
-  while (finger.getImage() != FINGERPRINT_NOFINGER) {
-    delay(100);
-  }
+  while (finger.getImage() != FINGERPRINT_NOFINGER) delay(100);
   
-  // Segunda imagen
+  publicarEstado(3, "Coloca el MISMO dedo nuevamente...");
   Serial.println("3️⃣ Coloca el MISMO DEDO nuevamente...");
-  actualizarEstado(userId, 3, false, "");
   
   p = -1;
   timeout = 0;
-  while (p != FINGERPRINT_OK && timeout < maxTimeout) {
+  while (p != FINGERPRINT_OK && timeout < 60) {
     p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) {
       if (timeout % 10 == 0) Serial.print(".");
@@ -205,39 +240,32 @@ bool capturarHuella(int userId) {
   }
   
   if (p != FINGERPRINT_OK) {
-    Serial.println("\n❌ Timeout: No se detectó segunda huella");
+    Serial.println("\n❌ Timeout");
     return false;
   }
   
   Serial.println("\n✅ Imagen 2 capturada!");
   p = finger.image2Tz(2);
-  if (p != FINGERPRINT_OK) {
-    Serial.println("❌ Error al procesar segunda imagen");
-    return false;
-  }
+  if (p != FINGERPRINT_OK) return false;
   
   p = finger.createModel();
   if (p != FINGERPRINT_OK) {
     Serial.println("❌ Las huellas NO coinciden!");
-    actualizarEstado(userId, 3, false, "error");
+    publicarEstado(3, "Error: Las huellas no coinciden");
+    digitalWrite(LED_PIN, LOW);
     return false;
   }
   
-  // Guardar en memoria del sensor (opcional, pero útil para verificación rápida)
   p = finger.storeModel(userId);
   if (p != FINGERPRINT_OK) {
-    Serial.println("❌ Error al guardar en memoria del sensor");
+    Serial.println("❌ Error al guardar");
   } else {
-    Serial.println("✅ Huella guardada en memoria del sensor");
+    Serial.println("✅ Huella guardada en memoria!");
   }
   
   Serial.println("✅ HUELLA REGISTRADA EXITOSAMENTE!");
+  publicarEstado(4, "¡Huella registrada exitosamente!");
   
-  // Enviar al servidor
-  String huellaData = String(userId) + "_" + String(millis());
-  actualizarEstado(userId, 4, true, huellaData);
-  
-  // Feedback visual
   for (int i = 0; i < 3; i++) {
     digitalWrite(LED_PIN, HIGH);
     delay(200);
@@ -246,112 +274,132 @@ bool capturarHuella(int userId) {
   }
   
   mostrarInfoSensor();
+  publicarInfoSensor();
   return true;
 }
 
 // ========== VERIFICAR HUELLA ==========
 int verificarHuella() {
-  Serial.println("\n🔍 VERIFICANDO HUELLA...");
-  Serial.println("👆 Coloca tu dedo en el sensor");
-  
   uint8_t p = finger.getImage();
-  if (p != FINGERPRINT_OK) {
-    if (p == FINGERPRINT_NOFINGER) {
-      Serial.println("❌ No se detectó dedo");
-    }
-    return -1;
-  }
+  if (p != FINGERPRINT_OK) return -1;
   
-  Serial.println("✅ Imagen capturada");
   p = finger.image2Tz();
   if (p != FINGERPRINT_OK) return -1;
   
   p = finger.fingerSearch();
   if (p == FINGERPRINT_OK) {
-    Serial.print("✅ ¡HUELLA RECONOCIDA! ID: ");
+    Serial.print("✅ HUELLA RECONOCIDA! ID: ");
     Serial.print(finger.fingerID);
     Serial.print(" | Confianza: ");
     Serial.println(finger.confidence);
     
-    // Feedback: LED parpadea 2 veces
+    // Publicar verificación exitosa
+    StaticJsonDocument<200> doc;
+    doc["tipo"] = "verificacion";
+    doc["user_id"] = finger.fingerID;
+    doc["exito"] = true;
+    doc["confianza"] = finger.confidence;
+    String output;
+    serializeJson(doc, output);
+    client.publish(mqtt_topic_huellas, output.c_str());
+    
+    // Feedback LED
     for (int i = 0; i < 2; i++) {
       digitalWrite(LED_PIN, HIGH);
       delay(100);
       digitalWrite(LED_PIN, LOW);
       delay(100);
     }
-    
     return finger.fingerID;
   }
   
-  if (p == FINGERPRINT_NOTFOUND) {
-    Serial.println("❌ Huella NO registrada");
-    // Feedback: LED parpadeo rápido de error
-    for (int i = 0; i < 3; i++) {
-      digitalWrite(LED_PIN, HIGH);
-      delay(50);
-      digitalWrite(LED_PIN, LOW);
-      delay(50);
-    }
-  }
+  Serial.println("❌ Huella NO registrada");
   
+  // Publicar verificación fallida
+  StaticJsonDocument<200> doc;
+  doc["tipo"] = "verificacion";
+  doc["exito"] = false;
+  String output;
+  serializeJson(doc, output);
+  client.publish(mqtt_topic_huellas, output.c_str());
+  
+  // Feedback error
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(50);
+    digitalWrite(LED_PIN, LOW);
+    delay(50);
+  }
   return -1;
 }
 
-// ========== LOOP PRINCIPAL (CORREGIDO) ==========
-void loop() {
-  // Detección automática de dedo (para verificación)
-  if (digitalRead(TOUCH_PIN) == LOW) {
-    delay(300); // Debounce
-    if (!registrando) {
-      int id = verificarHuella();
-      if (id > 0) {
-        Serial.println("🔓 ACCESO CONCEDIDO");
-        Serial.println("=========================================");
-      } else {
-        Serial.println("🔒 ACCESO DENEGADO");
-        Serial.println("=========================================");
-      }
+// ========== RECONECTAR MQTT ==========
+void reconnectMQTT() {
+  if (!client.connected()) {
+    Serial.print("🔄 Conectando a MQTT...");
+    
+    if (client.connect("ESP32_Huellas_001")) {
+      Serial.println("✅ Conectado!");
+      client.subscribe(mqtt_topic_comandos);
+      Serial.print("📡 Suscrito a: ");
+      Serial.println(mqtt_topic_comandos);
+      
+      // Publicar estado online
+      StaticJsonDocument<200> doc;
+      doc["tipo"] = "conexion";
+      doc["estado"] = "online";
+      doc["ip"] = WiFi.localIP().toString();
+      String output;
+      serializeJson(doc, output);
+      client.publish(mqtt_topic_huellas, output.c_str());
+      
+      publicarInfoSensor();
+    } else {
+      Serial.print("❌ Falló, rc=");
+      Serial.println(client.state());
     }
-    delay(1000); // Esperar antes de otra lectura
+  }
+}
+
+// ========== LOOP PRINCIPAL ==========
+void loop() {
+  // Reconectar MQTT si es necesario
+  if (!client.connected()) {
+    reconnectMQTT();
+  }
+  client.loop();
+  
+  // Detección automática de dedo (solo si no está registrando)
+  if (digitalRead(TOUCH_PIN) == LOW && !registrando) {
+    delay(300);
+    int id = verificarHuella();
+    if (id > 0) {
+      Serial.println("🔓 ACCESO CONCEDIDO");
+      Serial.println("=========================================");
+    } else {
+      Serial.println("🔒 ACCESO DENEGADO");
+      Serial.println("=========================================");
+    }
+    delay(1000);
   }
   
   // Comandos manuales por serial
   if (Serial.available()) {
     char cmd = Serial.read();
-    
     switch(cmd) {
-      case '1': {
-        // Registrar huella
-        registrando = true;
-        Serial.print("📝 Ingrese ID de usuario: ");
+      case '1':
+        Serial.print("📝 ID de usuario: ");
         while (!Serial.available()) delay(100);
         currentUserId = Serial.parseInt();
+        registrando = true;
         capturarHuella(currentUserId);
         registrando = false;
         break;
-      }
-      
-      case '2': {
-        // Limpiar memoria - CORREGIDO con llaves
-        Serial.print("⚠️ ¿Limpiar TODA la memoria del sensor? (s/n): ");
-        while (!Serial.available()) delay(100);
-        char confirm = Serial.read();
-        if (confirm == 's' || confirm == 'S') {
-          limpiarMemoriaSensor();
-        } else {
-          Serial.println("❌ Cancelado");
-        }
+      case '2':
+        limpiarMemoriaSensor();
         break;
-      }
-      
-      case '3': {
-        // Ver información del sensor
+      case '3':
         mostrarInfoSensor();
-        break;
-      }
-      
-      default:
         break;
     }
   }
