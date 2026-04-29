@@ -1,5 +1,30 @@
 // URL de la API
-export const API_URL = 'http://localhost:8000/api';
+//export const API_URL = 'http://localhost:8000/api';
+//export const API_URL = 'http://192.168.0.10:8000/api';
+
+// src/utiles/constantes.js
+
+// Detectar si estamos en el celular o en la PC
+const getApiUrl = () => {
+  // Si estamos en el navegador
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // Si accedemos desde un celular (IP de la red local)
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // Usar la IP del servidor (tu PC)
+      return 'http://192.168.0.10:8000/api';
+    }
+  }
+  
+  // Si estamos en la PC
+  return 'http://192.168.0.10:8000/api';
+};
+
+export const API_URL = getApiUrl();
+
+console.log('🌐 API URL configurada:', API_URL);
+
 //src/utiles/constantes.js
 // Roles del sistema
 export const ROLES = {

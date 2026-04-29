@@ -20,14 +20,29 @@ use App\Http\Controllers\Api\HuellaController;
 */
 
 // Rutas públicas
-Route::get('/ping', [PingController::class, 'ping']);
-Route::post('/login', [AuthController::class, 'login']);
 Route::get('/test-time', function() {
     return response()->json([
         'now' => now()->format('Y-m-d H:i:s'),
         'timezone' => config('app.timezone')
     ]);
 });
+// =============================================
+// RUTAS PÚBLICAS (No requieren autenticación)
+// =============================================
+Route::get('/ping', [PingController::class, 'ping']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login-huella', [HuellaController::class, 'verificar']);
+
+// Rutas de huellas públicas (ESP32 y frontend las usan)
+Route::post('/huellas/registrar', [HuellaController::class, 'registrar']);
+Route::post('/huellas/eliminar/{id}', [HuellaController::class, 'eliminar']);
+Route::get('/huellas/usuarios', [HuellaController::class, 'listarConHuella']);
+Route::get('/huellas/estado/{id}', [HuellaController::class, 'estadoRegistro']);
+Route::post('/huellas/iniciar-registro', [HuellaController::class, 'iniciarRegistro']);
+Route::post('/huellas/actualizar-estado', [HuellaController::class, 'actualizarEstado']);
+// Agregar dentro de las rutas públicas
+Route::post('/huellas/limpiar-sensor', [HuellaController::class, 'limpiarSensor']);
+
 // Rutas protegidas por Sanctum
 Route::middleware('auth:sanctum')->group(function () {
     
@@ -146,13 +161,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
     Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
-    
-    //rutas para huella dactilar
-    Route::post('/huellas/registrar', [HuellaController::class, 'registrar']);
-    Route::post('/huellas/eliminar/{id}', [HuellaController::class, 'eliminar']);
-    Route::get('/huellas/usuarios', [HuellaController::class, 'listarConHuella']);
-    
-    
+        
 });
-// Login con huella (público)
-Route::post('/login-huella', [HuellaController::class, 'verificar']);
