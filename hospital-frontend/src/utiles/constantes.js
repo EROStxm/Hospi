@@ -14,13 +14,16 @@ const getApiUrl = () => {
     // Si accedemos desde un celular (IP de la red local)
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
       // Usar la IP del servidor (tu PC)
-      return 'http://10.222.193.211:8000/api';
+      return 'http://10.181.206.211:8000/api';
+      //return 'http://10.222.193.211:8000/api';
       //return 'http://10.144.66.211:8000/api';
     }
   }
   
   // Si estamos en la PC
-  return 'http://10.222.193.211:8000/api';
+  return 'http://127.0.0.1:8000/api';
+  //return 'http://10.181.206.211:8000/api';
+  //return 'http://10.222.193.211:8000/api';
   //return 'http://10.144.66.211:8000/api';
 };
 
