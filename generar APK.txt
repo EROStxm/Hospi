@@ -6,3 +6,5 @@ npx expo build:android
 
 # O para desarrollo rápido (necesita app Expo Go)
 npx expo start
+
+

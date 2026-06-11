@@ -3,7 +3,9 @@
 // URL del servidor (cambiar según tu red)
 //export const API_URL = 'http://192.168.0.10:8000/api';
 export const API_URL = 'http://10.144.66.211:8000/api';
-export const ESP32_URL = 'http://192.168.0.25';
+
+//export const ESP32_URL = 'http://192.168.0.25';
+export const ESP32_URL = 'http://10.144.66.183';
 
 // Estados de solicitudes
 export const ESTADOS_SOLICITUD = {
