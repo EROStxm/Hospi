@@ -224,7 +224,6 @@ class SolicitudController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'tipo_solicitud' => 'required|in:sin_material,con_material',
             'titulo' => 'required|string|max:255',
             'descripcion' => 'required|string',
             'equipo_id' => 'required|exists:equipos,id',
@@ -234,7 +233,7 @@ class SolicitudController extends Controller
         $user = $request->user();
 
         $solicitud = Solicitud::create([
-            'tipo_solicitud' => $request->tipo_solicitud,
+            'tipo_solicitud' => 'sin material', // Por ahora fijo, se puede extender para otros tipos
             'titulo' => $request->titulo,
             'descripcion' => $request->descripcion,
             'equipo_id' => $request->equipo_id,
@@ -589,41 +588,65 @@ class SolicitudController extends Controller
 
     /**
      * Registrar uso de materiales
+     * SOLO soporte_tecnico, jefe_soporte o admin_sistema pueden registrar
+     * materiales, y solo si son el técnico asignado a esa solicitud
+     * (excepto jefe_soporte/admin que pueden hacerlo siempre).
      */
     public function usarMaterial(Request $request, $id)
     {
+        $user = $request->user();
+ 
+        // 1) Verificar rol permitido
+        $rolesPermitidos = ['soporte_tecnico', 'jefe_soporte', 'admin_sistema'];
+        if (!in_array($user->rol->nombre, $rolesPermitidos)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tiene permisos para registrar materiales. Solo personal técnico puede hacerlo.'
+            ], 403);
+        }
+ 
+        $solicitud = Solicitud::findOrFail($id);
+ 
+        // 2) Si es técnico (no jefe ni admin), debe ser el asignado a ESTA solicitud
+        if ($user->rol->nombre === 'soporte_tecnico' && $solicitud->tecnico_asignado_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solo el técnico asignado a esta solicitud puede registrar materiales.'
+            ], 403);
+        }
+ 
         $request->validate([
-            'materiales' => 'required|array',
+            'materiales' => 'required|array|min:1',
             'materiales.*.material_id' => 'required|exists:materiales,id',
             'materiales.*.cantidad' => 'required|integer|min:1'
         ]);
-
-        $solicitud = Solicitud::findOrFail($id);
-        
+ 
         DB::beginTransaction();
         try {
             foreach ($request->materiales as $item) {
                 $material = Material::find($item['material_id']);
-                
-                // Verificar stock
+ 
                 if ($material->stock < $item['cantidad']) {
                     throw new \Exception("Stock insuficiente para {$material->nombre}");
                 }
-                
-                // Reducir stock
+ 
                 $material->decrement('stock', $item['cantidad']);
-                
-                // Registrar en solicitudes_materiales
+ 
                 DB::table('solicitudes_materiales')->insert([
                     'solicitud_id' => $solicitud->id,
                     'material_id' => $item['material_id'],
-                    'cantidad' => $item['cantidad'],
-                    'creado_en' => now()
+                    'cantidad_usada' => $item['cantidad'],
+                    'registrado_por_id' => $user->id,
+                    'registrado_en' => now(),
+                    'creado_en' => now(),
                 ]);
             }
-            
+ 
+            // Marcar la solicitud como "con_material" ahora que se usó material real
+            $solicitud->update(['tipo_solicitud' => 'con_material']);
+ 
             DB::commit();
-            
+ 
             // NOTIFICACIÓN: Al solicitante
             NotificacionHelper::enviar(
                 $solicitud->solicitante_id,
@@ -633,12 +656,21 @@ class SolicitudController extends Controller
                 "/solicitudes/{$solicitud->id}",
                 $solicitud->id
             );
-            
+ 
+            // NOTIFICACIÓN: Al jefe de soporte (control de inventario)
+            NotificacionHelper::enviarAJefeSoporte(
+                'Materiales registrados',
+                "Se registraron materiales en la solicitud #{$solicitud->id}",
+                'info',
+                "/solicitudes/{$solicitud->id}",
+                $solicitud->id
+            );
+ 
             return response()->json([
                 'success' => true,
                 'message' => 'Materiales registrados correctamente'
             ]);
-            
+ 
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([

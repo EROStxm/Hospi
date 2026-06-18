@@ -6,7 +6,7 @@ import { sectorService } from '../servicios/sectorService';
 import { equipoService } from '../servicios/equipoService';
 import { ubicacionService } from '../servicios/ubicacionService';
 import toast from 'react-hot-toast';
-import { FiSave, FiX, FiCamera, FiCheckCircle } from 'react-icons/fi';
+import { FiSave, FiX, FiCamera, FiCheckCircle, FiInfo } from 'react-icons/fi';
 import '../estilos/nueva-solicitud.css';
 import SubirImagenes from '../componentes/comunes/SubirImagenes';
 
@@ -18,12 +18,13 @@ const NuevaSolicitudPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [equiposFiltrados, setEquiposFiltrados] = useState([]);
   const [ubicacionesFiltradas, setUbicacionesFiltradas] = useState([]);
-  
+
   const [solicitudCreadaId, setSolicitudCreadaId] = useState(null);
   const [imagenesSubidas, setImagenesSubidas] = useState(false);
-  
+
+  // Ya NO incluye tipo_solicitud: el sistema lo asigna automáticamente
+  // como 'sin_material' y el técnico decide después si usó materiales.
   const [formData, setFormData] = useState({
-    tipo_solicitud: 'sin_material',
     titulo: '',
     descripcion: '',
     sector_id: '',
@@ -41,8 +42,7 @@ const NuevaSolicitudPage = () => {
 
   useEffect(() => {
     if (formData.sector_id && Array.isArray(equipos)) {
-      const filtrados = equipos.filter(e => e.sector_id == formData.sector_id);
-      setEquiposFiltrados(filtrados);
+      setEquiposFiltrados(equipos.filter(e => e.sector_id == formData.sector_id));
     } else {
       setEquiposFiltrados([]);
     }
@@ -50,32 +50,17 @@ const NuevaSolicitudPage = () => {
 
   useEffect(() => {
     if (formData.sector_id && Array.isArray(ubicaciones)) {
-      const filtradas = ubicaciones.filter(u => u.sector_id == formData.sector_id);
-      setUbicacionesFiltradas(filtradas);
+      setUbicacionesFiltradas(ubicaciones.filter(u => u.sector_id == formData.sector_id));
     } else {
       setUbicacionesFiltradas([]);
     }
   }, [formData.sector_id, ubicaciones]);
 
-  // =============================================
-  // FUNCIONES CORREGIDAS PARA CARGAR DATOS
-  // =============================================
-  
   const cargarSectores = async () => {
     try {
       const response = await sectorService.obtenerTodos();
-      console.log('📦 Sectores response:', response);
-      
       if (response.success) {
-        // Manejar diferentes formatos de respuesta
-        let datos = [];
-        if (response.data?.data) {
-          datos = response.data.data; // Paginated
-        } else if (response.data) {
-          datos = response.data;
-        } else {
-          datos = response;
-        }
+        const datos = response.data?.data ?? response.data ?? response;
         setSectores(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
@@ -87,17 +72,8 @@ const NuevaSolicitudPage = () => {
   const cargarEquipos = async () => {
     try {
       const response = await equipoService.obtenerTodos();
-      console.log('📦 Equipos response:', response);
-      
       if (response.success) {
-        let datos = [];
-        if (response.data?.data) {
-          datos = response.data.data;
-        } else if (response.data) {
-          datos = response.data;
-        } else {
-          datos = response;
-        }
+        const datos = response.data?.data ?? response.data ?? response;
         setEquipos(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
@@ -109,17 +85,8 @@ const NuevaSolicitudPage = () => {
   const cargarUbicaciones = async () => {
     try {
       const response = await ubicacionService.obtenerTodos();
-      console.log('📦 Ubicaciones response:', response);
-      
       if (response.success) {
-        let datos = [];
-        if (response.data?.data) {
-          datos = response.data.data;
-        } else if (response.data) {
-          datos = response.data;
-        } else {
-          datos = response;
-        }
+        const datos = response.data?.data ?? response.data ?? response;
         setUbicaciones(Array.isArray(datos) ? datos : []);
       }
     } catch (error) {
@@ -128,58 +95,31 @@ const NuevaSolicitudPage = () => {
     }
   };
 
-  // =============================================
-  // RESTO DEL CÓDIGO IGUAL
-  // =============================================
-
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-    
-    if (errores[name]) {
-      setErrores({ ...errores, [name]: null });
-    }
+    setFormData({ ...formData, [name]: value });
+    if (errores[name]) setErrores({ ...errores, [name]: null });
   };
 
   const validarFormulario = () => {
     const nuevosErrores = {};
-    
-    if (!formData.titulo.trim()) {
-      nuevosErrores.titulo = 'El título es requerido';
-    }
-    
-    if (!formData.descripcion.trim()) {
-      nuevosErrores.descripcion = 'La descripción es requerida';
-    }
-    
-    if (!formData.sector_id) {
-      nuevosErrores.sector_id = 'Seleccione un sector';
-    }
-    
-    if (!formData.equipo_id) {
-      nuevosErrores.equipo_id = 'Seleccione un equipo';
-    }
-    
+    if (!formData.titulo.trim())      nuevosErrores.titulo = 'El título es requerido';
+    if (!formData.descripcion.trim()) nuevosErrores.descripcion = 'La descripción es requerida';
+    if (!formData.sector_id)          nuevosErrores.sector_id = 'Seleccione un sector';
+    if (!formData.equipo_id)          nuevosErrores.equipo_id = 'Seleccione un equipo';
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validarFormulario()) {
       toast.error('Por favor complete todos los campos requeridos');
       return;
     }
-    
     setCargando(true);
-    
     try {
       const response = await solicitudService.crear(formData);
-      
       if (response.success) {
         setSolicitudCreadaId(response.data.id);
         toast.success('¡Solicitud creada! Ahora puedes agregar fotos');
@@ -193,13 +133,11 @@ const NuevaSolicitudPage = () => {
   };
 
   const handleFinalizar = () => {
-    if (imagenesSubidas) {
-      toast.success('¡Solicitud completada con fotos!');
-    }
+    if (imagenesSubidas) toast.success('¡Solicitud completada con fotos!');
     navigate('/mis-solicitudes');
   };
 
-  // Si ya se creó la solicitud, mostrar sección de fotos
+  // ── Pantalla de subida de fotos tras crear ──────────────────────
   if (solicitudCreadaId) {
     return (
       <div className="nueva-solicitud-page">
@@ -217,10 +155,8 @@ const NuevaSolicitudPage = () => {
           </div>
 
           <div className="upload-container">
-            <h3>
-              <FiCamera /> Fotos de la solicitud (opcional)
-            </h3>
-            <SubirImagenes 
+            <h3><FiCamera /> Fotos de la solicitud (opcional)</h3>
+            <SubirImagenes
               solicitudId={solicitudCreadaId}
               onImagenesSubidas={() => {
                 setImagenesSubidas(true);
@@ -230,16 +166,10 @@ const NuevaSolicitudPage = () => {
           </div>
 
           <div className="form-actions">
-            <button 
-              className="btn-primary"
-              onClick={handleFinalizar}
-            >
+            <button className="btn-primary" onClick={handleFinalizar}>
               {imagenesSubidas ? '✅ Finalizar y ver solicitudes' : '⏭️ Omitir fotos y finalizar'}
             </button>
-            <button 
-              className="btn-secondary"
-              onClick={() => navigate(`/solicitudes/${solicitudCreadaId}`)}
-            >
+            <button className="btn-secondary" onClick={() => navigate(`/solicitudes/${solicitudCreadaId}`)}>
               👁️ Ver solicitud creada
             </button>
           </div>
@@ -248,7 +178,7 @@ const NuevaSolicitudPage = () => {
     );
   }
 
-  // Formulario normal
+  // ── Formulario normal ───────────────────────────────────────────
   return (
     <div className="nueva-solicitud-page">
       <div className="page-header">
@@ -259,36 +189,14 @@ const NuevaSolicitudPage = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="solicitud-form">
-        {/* Tipo de Solicitud */}
-        <div className="form-section">
-          <label className="form-label">Tipo de Solicitud *</label>
-          <div className="tipo-solicitud-group">
-            <label className={`tipo-option ${formData.tipo_solicitud === 'sin_material' ? 'active' : ''}`}>
-              <input
-                type="radio"
-                name="tipo_solicitud"
-                value="sin_material"
-                checked={formData.tipo_solicitud === 'sin_material'}
-                onChange={handleChange}
-              />
-              <span className="tipo-icon">🔧</span>
-              <span className="tipo-text">Sin Material</span>
-              <small>No requiere aprobación adicional</small>
-            </label>
-            
-            <label className={`tipo-option ${formData.tipo_solicitud === 'con_material' ? 'active' : ''}`}>
-              <input
-                type="radio"
-                name="tipo_solicitud"
-                value="con_material"
-                checked={formData.tipo_solicitud === 'con_material'}
-                onChange={handleChange}
-              />
-              <span className="tipo-icon">📦</span>
-              <span className="tipo-text">Con Material</span>
-              <small>Requiere aprobación de jefe de servicio</small>
-            </label>
-          </div>
+
+        {/* Aviso informativo: ya no se elige tipo de material */}
+        <div className="info-banner">
+          <FiInfo />
+          <span>
+            El técnico evaluará el equipo y registrará los materiales que se
+            necesiten durante la reparación. No es necesario indicarlo aquí.
+          </span>
         </div>
 
         {/* Sector */}
@@ -386,18 +294,10 @@ const NuevaSolicitudPage = () => {
 
         {/* Botones */}
         <div className="form-actions">
-          <button
-            type="button"
-            className="btn-cancel"
-            onClick={() => navigate('/mis-solicitudes')}
-          >
+          <button type="button" className="btn-cancel" onClick={() => navigate('/mis-solicitudes')}>
             <FiX /> Cancelar
           </button>
-          <button
-            type="submit"
-            className="btn-submit"
-            disabled={cargando}
-          >
+          <button type="submit" className="btn-submit" disabled={cargando}>
             {cargando ? 'Creando...' : <><FiSave /> Crear Solicitud</>}
           </button>
         </div>

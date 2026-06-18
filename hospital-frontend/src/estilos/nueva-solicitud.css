@@ -216,3 +216,27 @@
     justify-content: center;
   }
 }
+/* =====================================================
+   AGREGAR a src/estilos/nueva-solicitud.css
+   (no reemplaza el archivo, solo añade esta regla)
+   ===================================================== */
+
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  color: #1e40af;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.info-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 16px;
+}

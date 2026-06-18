@@ -1,8 +1,9 @@
 // src/paginas/Dashboard.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiAlertTriangle, FiClock, FiCheckCircle, FiTool, FiEye } from 'react-icons/fi';
+import { FiAlertTriangle, FiClock, FiCheckCircle, FiTool, FiEye, FiWifi } from 'react-icons/fi';
 import api from '../servicios/api';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import '../estilos/dashboard.css';
 
 const Dashboard = ({ usuario }) => {
@@ -15,17 +16,15 @@ const Dashboard = ({ usuario }) => {
     stock_bajo: 0,
     recientes: []
   });
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando]   = useState(true);
+  const [actualizando, setActualizando] = useState(false);
 
-  useEffect(() => {
-    cargarEstadisticas();
-  }, []);
-
-  const cargarEstadisticas = async () => {
+  const cargarEstadisticas = useCallback(async (silencioso = false) => {
     try {
-      setCargando(true);
+      if (!silencioso) setCargando(true);
+      else setActualizando(true);
+
       const response = await api.get('/estadisticas');
-      
       if (response.data.success) {
         setStats(response.data.data);
       }
@@ -33,15 +32,22 @@ const Dashboard = ({ usuario }) => {
       console.error('Error cargando estadísticas:', error);
     } finally {
       setCargando(false);
+      setActualizando(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
+
+  // 🔴 Auto-refresh: cuando llega cualquier notificación (nueva solicitud,
+  // cambio de estado, etc.) recargamos las estadísticas en silencio.
+  useAutoRefresh(() => cargarEstadisticas(true));
 
   const formatearFecha = (fecha) => {
     if (!fecha) return 'Sin fecha';
     return new Date(fecha).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+      day: '2-digit', month: 'short', year: 'numeric'
     });
   };
 
@@ -75,7 +81,14 @@ const Dashboard = ({ usuario }) => {
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
-        <h1>Dashboard</h1>
+        <h1>
+          Dashboard
+          {actualizando && (
+            <span className="live-indicator" title="Actualizando en tiempo real">
+              <FiWifi /> actualizando…
+            </span>
+          )}
+        </h1>
         <p>Resumen general del sistema</p>
       </div>
 
@@ -126,14 +139,12 @@ const Dashboard = ({ usuario }) => {
         </div>
       </div>
 
-      {/* Alerta de stock bajo (solo admin/soporte) */}
       {(esAdmin || esSoporte) && stats.stock_bajo > 0 && (
         <div className="alert-warning" onClick={() => navigate('/materiales')}>
           <FiAlertTriangle /> Hay {stats.stock_bajo} materiales con stock bajo. Click para revisar.
         </div>
       )}
 
-      {/* Solicitudes recientes */}
       <div className="recent-section">
         <div className="section-header">
           <h3 className="section-title">Solicitudes Recientes</h3>
@@ -149,18 +160,14 @@ const Dashboard = ({ usuario }) => {
             stats.recientes.map((solicitud) => {
               const estado = getEstadoBadge(solicitud.estado);
               return (
-                <div 
-                  key={solicitud.id} 
+                <div
+                  key={solicitud.id}
                   className="recent-item"
                   onClick={() => navigate(`/solicitudes/${solicitud.id}`)}
                 >
-                  <div className="recent-icon">
-                    <FiTool />
-                  </div>
+                  <div className="recent-icon"><FiTool /></div>
                   <div className="recent-content">
-                    <div className="recent-title">
-                      #{solicitud.id} - {solicitud.titulo}
-                    </div>
+                    <div className="recent-title">#{solicitud.id} - {solicitud.titulo}</div>
                     <div className="recent-meta">
                       <span>{solicitud.equipo?.nombre || 'Sin equipo'}</span>
                       <span>•</span>
@@ -169,9 +176,7 @@ const Dashboard = ({ usuario }) => {
                       <span>{formatearFecha(solicitud.creado_en)}</span>
                     </div>
                   </div>
-                  <span className={`status-badge ${estado.className}`}>
-                    {estado.label}
-                  </span>
+                  <span className={`status-badge ${estado.className}`}>{estado.label}</span>
                   <FiEye className="view-icon" />
                 </div>
               );
@@ -180,7 +185,6 @@ const Dashboard = ({ usuario }) => {
         </div>
       </div>
 
-      {/* Accesos rápidos */}
       <div className="quick-actions">
         <button className="quick-btn" onClick={() => navigate('/nueva-solicitud')}>
           📝 Nueva Solicitud
@@ -190,12 +194,8 @@ const Dashboard = ({ usuario }) => {
         </button>
         {esAdmin && (
           <>
-            <button className="quick-btn" onClick={() => navigate('/equipos')}>
-              🔧 Equipos
-            </button>
-            <button className="quick-btn" onClick={() => navigate('/usuarios')}>
-              👥 Usuarios
-            </button>
+            <button className="quick-btn" onClick={() => navigate('/equipos')}>🔧 Equipos</button>
+            <button className="quick-btn" onClick={() => navigate('/usuarios')}>👥 Usuarios</button>
           </>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
   FiUserPlus, FiPackage, FiMessageCircle, FiSend, FiX
 } from 'react-icons/fi';
 import '../estilos/detalle-solicitud.css';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 import SubirImagenes from '../componentes/comunes/SubirImagenes';
 
@@ -67,6 +68,12 @@ const DetalleSolicitudPage = () => {
     cargarMateriales();
     cargarSectores();
   }, [id]);
+  // 🔴 Auto-refresh: si alguien firma, asigna técnico, o cambia el estado
+  // de ESTA solicitud específica desde otra sesión, se actualiza sola.
+  useAutoRefresh(
+    () => cargarSolicitud(),
+    { soloSiSolicitudId: parseInt(id) }
+  );
 
   const cargarUsuarioActual = () => {
     const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
