@@ -1,81 +1,55 @@
+/* =====================================================
+   LAYOUT — Un bloque limpio, sin reglas duplicadas
+   ===================================================== */
+
 .layout-wrapper {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f0f2f5;
+  background: #f0f4f8;
 }
 
 .layout-main {
   display: flex;
   flex: 1;
-  padding-top: 60px; /* Altura del navbar */
+  padding-top: 60px; /* altura del navbar */
 }
 
+/* ── Contenido principal (empuja por el sidebar) ── */
 .layout-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 60px);
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
+  margin-left: 240px;       /* ancho del sidebar desktop */
+  transition: margin-left 0.28s cubic-bezier(0.4,0,0.2,1);
+  background: #f0f4f8;
 }
 
 .content-main {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
 }
 
-/* Responsive */
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .layout-content {
-    margin-left: 0;
+    margin-left: 0;   /* sidebar se superpone, no empuja */
   }
-  
+
+  /* Cuando el sidebar está abierto en móvil no movemos el contenido
+     porque el overlay ya bloquea la interacción */
   .layout-content.sidebar-open {
     margin-left: 0;
   }
-  
+
   .content-main {
-    padding: 15px;
+    padding: 16px 12px;
   }
 }
 
-/**/
-.layout-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f0f2f5; /* Fondo gris claro consistente */
-}
-
-.layout-main {
-  display: flex;
-  flex: 1;
-  padding-top: 70px; /* Altura del navbar */
-}
-
-.layout-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - 70px);
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
-  background: #f0f2f5;
-}
-
-.content-main {
-  flex: 1;
-  padding: 20px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .layout-content {
-    margin-left: 0;
-  }
-  
+@media (max-width: 480px) {
   .content-main {
-    padding: 15px;
+    padding: 12px 10px;
   }
 }

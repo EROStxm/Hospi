@@ -4,77 +4,113 @@ namespace App\Helpers;
 
 use App\Models\Notificacion;
 use App\Models\User;
+use App\Events\NotificacionCreada;
+use Illuminate\Support\Facades\Log;
 
 class NotificacionHelper
 {
     /**
      * Enviar notificación a un usuario específico
      */
-    public static function enviar($usuarioId, $titulo, $mensaje, $tipo, $url = null, $solicitudId = null)
-    {
-        return Notificacion::create([
-            'usuario_id' => $usuarioId,
-            'titulo' => $titulo,
-            'mensaje' => $mensaje,
-            'tipo' => $tipo, // 'info', 'success', 'warning', 'danger'
-            'solicitud_id' => $solicitudId,
-            'enviado_via' => 'web',
-            'creado_en' => now()
-        ]);
-    }
-    
-    /**
-     * Enviar notificación a todos los usuarios de un rol
-     */
-    public static function enviarARol($rolId, $titulo, $mensaje, $tipo, $url = null, $solicitudId = null)
-    {
-        $usuarios = User::where('rol_id', $rolId)->get();
-        
-        foreach ($usuarios as $usuario) {
-            self::enviar($usuario->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
+    public static function enviar(
+        int $usuarioId,
+        string $titulo,
+        string $mensaje,
+        string $tipo = 'info',
+        string $url = null,
+        int $solicitudId = null
+    ): ?Notificacion {
+        try {
+            $notificacion = Notificacion::create([
+                'usuario_id'   => $usuarioId,
+                'tipo'         => $tipo,
+                'titulo'       => $titulo,
+                'mensaje'      => $mensaje,
+                'solicitud_id' => $solicitudId,
+                'enviado_via'  => 'web',
+                'creado_en'    => now(),
+            ]);
+
+            // 🔴 BROADCAST via Reverb al canal privado del usuario
+            $data = [
+                'id'           => $notificacion->id,
+                'tipo'         => $tipo,
+                'titulo'       => $titulo,
+                'mensaje'      => $mensaje,
+                'solicitud_id' => $solicitudId,
+                'url'          => $url,
+                'leido_en'     => null,
+                'creado_en'    => $notificacion->creado_en->toISOString(),
+            ];
+
+            broadcast(new NotificacionCreada($data, $usuarioId))->toOthers();
+
+            return $notificacion;
+
+        } catch (\Exception $e) {
+            Log::error('Error al enviar notificación: ' . $e->getMessage());
+            return null;
         }
     }
-    
+
     /**
-     * Enviar notificación a todos los técnicos
+     * Enviar a todos los técnicos (rol soporte_tecnico)
      */
-    public static function enviarATecnicos($titulo, $mensaje, $tipo, $url = null, $solicitudId = null)
-    {
-        $tecnicos = User::whereHas('rol', function($query) {
-            $query->where('nombre', 'soporte_tecnico');
-        })->get();
-        
+    public static function enviarATecnicos(
+        string $titulo,
+        string $mensaje,
+        string $tipo = 'info',
+        string $url = null,
+        int $solicitudId = null
+    ): void {
+        $tecnicos = User::whereHas('rol', function ($q) {
+            $q->where('nombre', 'soporte_tecnico');
+        })->where('esta_activo', true)->get();
+
         foreach ($tecnicos as $tecnico) {
             self::enviar($tecnico->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
         }
     }
-    
+
     /**
-     * Enviar notificación al jefe de soporte
+     * Enviar al jefe de soporte
      */
-    public static function enviarAJefeSoporte($titulo, $mensaje, $tipo, $url = null, $solicitudId = null)
-    {
-        $jefeSoporte = User::whereHas('rol', function($query) {
-            $query->where('nombre', 'jefe_soporte');
-        })->first();
-        
-        if ($jefeSoporte) {
-            self::enviar($jefeSoporte->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
+    public static function enviarAJefeSoporte(
+        string $titulo,
+        string $mensaje,
+        string $tipo = 'info',
+        string $url = null,
+        int $solicitudId = null
+    ): void {
+        $jefes = User::whereHas('rol', function ($q) {
+            $q->where('nombre', 'jefe_soporte');
+        })->where('esta_activo', true)->get();
+
+        foreach ($jefes as $jefe) {
+            self::enviar($jefe->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
         }
     }
-    
+
     /**
-     * Enviar notificación al jefe de servicio correspondiente
+     * Enviar al jefe de servicio del sector indicado
      */
-    public static function enviarAJefeServicio($sectorId, $titulo, $mensaje, $tipo, $url = null, $solicitudId = null)
-    {
-        $jefeServicio = User::where('sector_id', $sectorId)
-            ->whereHas('rol', function($query) {
-                $query->where('nombre', 'jefe_servicio');
-            })->first();
-        
-        if ($jefeServicio) {
-            self::enviar($jefeServicio->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
+    public static function enviarAJefeServicio(
+        int $sectorId,
+        string $titulo,
+        string $mensaje,
+        string $tipo = 'info',
+        string $url = null,
+        int $solicitudId = null
+    ): void {
+        $jefes = User::whereHas('rol', function ($q) {
+            $q->where('nombre', 'jefe_servicio');
+        })
+        ->where('sector_id', $sectorId)
+        ->where('esta_activo', true)
+        ->get();
+
+        foreach ($jefes as $jefe) {
+            self::enviar($jefe->id, $titulo, $mensaje, $tipo, $url, $solicitudId);
         }
     }
 }

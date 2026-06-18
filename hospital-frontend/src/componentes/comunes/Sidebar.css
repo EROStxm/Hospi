@@ -1,107 +1,204 @@
+/* =====================================================
+   SIDEBAR — Estética militar, responsive limpio
+   ===================================================== */
+
 .sidebar {
   position: fixed;
   top: 60px;
   left: 0;
   bottom: 0;
-  width: 250px;
-  background: white;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  width: 240px;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.06);
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 999;
-  transition: transform 0.3s ease;
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  flex-direction: column;
 }
 
+/* Scrollbar sutil */
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+
+/* ── Header (solo móvil) ── */
 .sidebar-header {
   display: none;
-  padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #1e3a5f;
+  color: white;
+  flex-shrink: 0;
 }
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 16px;
-  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .sidebar-close {
-  display: none;
-  background: none;
+  background: rgba(255,255,255,0.12);
   border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: #666;
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 20px;
   line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
 }
 
-.sidebar-menu {
-  padding: 20px 0;
+.sidebar-close:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Sección de usuario (desktop) ── */
+.sidebar-user {
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
 }
 
+.sidebar-user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e3a5f, #2d5282);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.sidebar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+/* ── Grupo de menú ── */
+.sidebar-group {
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sidebar-group:last-child { border-bottom: none; }
+
+.sidebar-group-label {
+  padding: 8px 20px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Item del menú ── */
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: 11px;
+  padding: 10px 20px;
   color: #4b5563;
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: background 0.15s, color 0.15s, border-left-color 0.15s;
   border-left: 3px solid transparent;
+  margin: 1px 0;
+  position: relative;
 }
 
 .sidebar-item:hover {
-  background: #f3f4f6;
-  color: #4a90e2;
+  background: #f0f7ff;
+  color: #1e3a5f;
   text-decoration: none;
+  border-left-color: #93c5fd;
 }
 
 .sidebar-item.active {
   background: #eff6ff;
-  color: #4a90e2;
-  border-left-color: #4a90e2;
-  font-weight: 500;
+  color: #1e3a5f;
+  border-left-color: #1e3a5f;
+  font-weight: 600;
 }
 
+.sidebar-item.active .sidebar-icon { filter: none; opacity: 1; }
+
 .sidebar-icon {
-  font-size: 20px;
-  min-width: 24px;
+  font-size: 18px;
+  min-width: 22px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .sidebar-text {
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1;
 }
 
+/* ── Overlay oscuro en móvil ── */
 .sidebar-overlay {
   display: none;
   position: fixed;
+  inset: 0;
   top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0,0,0,0.45);
   z-index: 998;
+  backdrop-filter: blur(2px);
+  animation: overlay-in 0.2s ease;
 }
 
-/* Responsive */
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — El sidebar se oculta en móvil
+   ═══════════════════════════════════════════════ */
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
+    top: 0;           /* En móvil empieza desde arriba */
+    width: 280px;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
   }
-  
+
   .sidebar.open {
     transform: translateX(0);
   }
-  
+
   .sidebar-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    padding-top: 20px; /* Espacio extra arriba en móvil */
   }
-  
-  .sidebar-close {
-    display: block;
-  }
-  
-  .sidebar-overlay {
-    display: block;
-  }
+
+  /* Ocultar sección de usuario en móvil (ya está en el header) */
+  .sidebar-user { display: none; }
+
+  .sidebar-overlay { display: block; }
 }

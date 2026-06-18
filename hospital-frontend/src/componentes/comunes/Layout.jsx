@@ -1,3 +1,4 @@
+// src/componentes/comunes/Layout.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
@@ -24,26 +25,28 @@ const Layout = ({ children, usuario: usuarioProp, onLogout }) => {
     }
   };
 
+  const toggleSidebar = () => setSidebarAbierto(prev => !prev);
+
   return (
     <div className="layout-wrapper">
-      <Navbar 
-        usuario={usuario} 
+      <Navbar
+        usuario={usuario}
         onLogout={manejarLogout}
-        onMenuClick={() => setSidebarAbierto(!sidebarAbierto)}
+        onMenuClick={toggleSidebar}
+        sidebarAbierto={sidebarAbierto}
       />
-      
+
       <div className="layout-main">
-        <Sidebar 
-          usuario={usuario} 
+        <Sidebar
+          usuario={usuario}
           isOpen={sidebarAbierto}
           onClose={() => setSidebarAbierto(false)}
         />
-        
+
         <div className={`layout-content ${sidebarAbierto ? 'sidebar-open' : ''}`}>
           <main className="content-main">
             {children}
           </main>
-          
           <Footer />
         </div>
       </div>

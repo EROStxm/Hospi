@@ -1,220 +1,176 @@
-import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+// src/paginas/NotificacionesPage.jsx
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FiBell, FiCheck, FiCheckCircle, FiTrash2, FiFilter } from 'react-icons/fi';
+import api from '../servicios/api';
 import toast from 'react-hot-toast';
-import notificacionService from '../servicios/notificacionService';
-import Layout from '../componentes/comunes/Layout';
-import '../estilos/notificaciones.css'; // ← Importar CSS
+import '../estilos/notificaciones.css';
 
 const NotificacionesPage = () => {
-    const [notificaciones, setNotificaciones] = useState([]);
-    const [cargando, setCargando] = useState(true);
-    const [pagina, setPagina] = useState(1);
-    const [totalPaginas, setTotalPaginas] = useState(1);
-    const [totalRegistros, setTotalRegistros] = useState(0);
-    const [filtro, setFiltro] = useState('todas');
+  const navigate = useNavigate();
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [cargando, setCargando]             = useState(true);
+  const [filtro, setFiltro]                 = useState('todas');
 
-    useEffect(() => {
-        cargarNotificaciones();
-    }, [pagina, filtro]);
+  const colorTipo = { success: '#10b981', warning: '#f59e0b', info: '#3b82f6', error: '#ef4444' };
+  const iconoTipo = { success: '✅', warning: '⚠️', info: 'ℹ️', error: '❌' };
 
-    const cargarNotificaciones = async () => {
-        setCargando(true);
-        try {
-            const response = await notificacionService.obtenerNotificaciones(
-                pagina,
-                filtro === 'no_leidas'
-            );
-            
-            const notificacionesData = response.data.data || [];
-            
-            const notificacionesConLeida = notificacionesData.map(n => ({
-                ...n,
-                leida: n.leido_en !== null
-            }));
-            
-            setNotificaciones(notificacionesConLeida);
-            setTotalPaginas(response.data.last_page);
-            setTotalRegistros(response.data.total);
-        } catch (error) {
-            console.error('Error cargando notificaciones:', error);
-            toast.error('Error al cargar notificaciones');
-        } finally {
-            setCargando(false);
-        }
-    };
+  const cargar = useCallback(async () => {
+    try {
+      setCargando(true);
+      const res = await api.get('/notificaciones?per_page=50');
+      const data = res.data?.data ?? res.data ?? [];
+      setNotificaciones(Array.isArray(data) ? data : (data.data ?? []));
+    } catch (e) {
+      toast.error('Error al cargar notificaciones');
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
-    const handleMarcarLeida = async (id) => {
-        try {
-            await notificacionService.marcarLeida(id);
-            setNotificaciones(prev =>
-                prev.map(n => n.id === id ? { ...n, leida: true, leido_en: new Date().toISOString() } : n)
-            );
-            toast.success('Notificación marcada como leída');
-            window.dispatchEvent(new CustomEvent('recargar-notificaciones'));
-        } catch (error) {
-            toast.error('Error al marcar notificación');
-        }
-    };
+  useEffect(() => { cargar(); }, [cargar]);
 
-    const handleMarcarTodasLeidas = async () => {
-        try {
-            await notificacionService.marcarTodasLeidas();
-            setNotificaciones(prev =>
-                prev.map(n => ({ ...n, leida: true, leido_en: new Date().toISOString() }))
-            );
-            toast.success('Todas las notificaciones marcadas como leídas');
-            window.dispatchEvent(new CustomEvent('recargar-notificaciones'));
-        } catch (error) {
-            toast.error('Error al marcar notificaciones');
-        }
-    };
-
-    const handleEliminar = async (id) => {
-        try {
-            await notificacionService.eliminarNotificacion(id);
-            setNotificaciones(prev => prev.filter(n => n.id !== id));
-            toast.success('Notificación eliminada');
-            window.dispatchEvent(new CustomEvent('recargar-notificaciones'));
-        } catch (error) {
-            toast.error('Error al eliminar notificación');
-        }
-    };
-
-    const getIconoPorTipo = (tipo) => {
-        const iconos = {
-            info: '🔵',
-            success: '✅',
-            warning: '⚠️',
-            danger: '🔴'
-        };
-        return iconos[tipo] || '📢';
-    };
-
-    const getColorPorTipo = (tipo) => {
-        const colores = {
-            info: 'notificacion-info',
-            success: 'notificacion-success',
-            warning: 'notificacion-warning',
-            danger: 'notificacion-danger'
-        };
-        return colores[tipo] || 'notificacion-default';
-    };
-
-    return (
-        <Layout>
-            <div className="notificaciones-container">
-                <div className="notificaciones-header">
-                    <div className="titulo-section">
-                        <span className="icono-titulo">🔔</span>
-                        <h1>Notificaciones</h1>
-                        {totalRegistros > 0 && (
-                            <span className="total-badge">{totalRegistros}</span>
-                        )}
-                    </div>
-                    <div className="acciones-header">
-                        <select
-                            value={filtro}
-                            onChange={(e) => {
-                                setFiltro(e.target.value);
-                                setPagina(1);
-                            }}
-                            className="filtro-select"
-                        >
-                            <option value="todas">Todas</option>
-                            <option value="no_leidas">No leídas</option>
-                        </select>
-                        <button
-                            onClick={handleMarcarTodasLeidas}
-                            className="btn-marcar-todas"
-                        >
-                            ✓✓ Marcar todas
-                        </button>
-                    </div>
-                </div>
-
-                <div className="notificaciones-lista">
-                    {cargando ? (
-                        <div className="cargando">Cargando notificaciones...</div>
-                    ) : notificaciones.length === 0 ? (
-                        <div className="vacio">
-                            <span className="icono-vacio">🔔</span>
-                            <p>No hay notificaciones</p>
-                        </div>
-                    ) : (
-                        notificaciones.map((notificacion) => (
-                            <div
-                                key={notificacion.id}
-                                className={`notificacion-card ${getColorPorTipo(notificacion.tipo)} ${!notificacion.leida ? 'no-leida' : ''}`}
-                            >
-                                <div className="notificacion-contenido">
-                                    <div className="notificacion-icono">
-                                        {getIconoPorTipo(notificacion.tipo)}
-                                    </div>
-                                    <div className="notificacion-detalle">
-                                        <div className="notificacion-titulo">
-                                            {notificacion.titulo}
-                                            {!notificacion.leida && (
-                                                <span className="badge-nueva">Nueva</span>
-                                            )}
-                                        </div>
-                                        <p className="notificacion-mensaje">
-                                            {notificacion.mensaje}
-                                        </p>
-                                        <div className="notificacion-footer">
-                                            <span className="notificacion-fecha">
-                                                {format(new Date(notificacion.creado_en), "PPP 'a las' p", {
-                                                    locale: es
-                                                })}
-                                            </span>
-                                            <div className="acciones">
-                                                {!notificacion.leida && (
-                                                    <button
-                                                        onClick={() => handleMarcarLeida(notificacion.id)}
-                                                        className="btn-marcar"
-                                                    >
-                                                        ✓ Marcar leída
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleEliminar(notificacion.id)}
-                                                    className="btn-eliminar"
-                                                >
-                                                    🗑 Eliminar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                {totalPaginas > 1 && (
-                    <div className="paginacion">
-                        <button
-                            onClick={() => setPagina(p => Math.max(1, p - 1))}
-                            disabled={pagina === 1}
-                            className="btn-pagina"
-                        >
-                            Anterior
-                        </button>
-                        <span className="pagina-info">
-                            Página {pagina} de {totalPaginas}
-                        </span>
-                        <button
-                            onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
-                            disabled={pagina === totalPaginas}
-                            className="btn-pagina"
-                        >
-                            Siguiente
-                        </button>
-                    </div>
-                )}
-            </div>
-        </Layout>
+  const marcarLeida = async (id) => {
+    await api.put(`/notificaciones/${id}/leida`);
+    setNotificaciones(prev =>
+      prev.map(n => n.id === id ? { ...n, leido_en: new Date().toISOString() } : n)
     );
+  };
+
+  const marcarTodasLeidas = async () => {
+    await api.put('/notificaciones/marcar-todas-leidas');
+    setNotificaciones(prev =>
+      prev.map(n => ({ ...n, leido_en: n.leido_en ?? new Date().toISOString() }))
+    );
+    toast.success('Todas marcadas como leídas');
+  };
+
+  const eliminar = async (id) => {
+    await api.delete(`/notificaciones/${id}`);
+    setNotificaciones(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleClick = async (notif) => {
+    if (!notif.leido_en) await marcarLeida(notif.id);
+    if (notif.solicitud_id) navigate(`/solicitudes/${notif.solicitud_id}`);
+  };
+
+  const formatearFecha = (fecha) => {
+    if (!fecha) return '';
+    return new Date(fecha).toLocaleString('es-ES', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const filtradas = notificaciones.filter(n => {
+    if (filtro === 'todas')    return true;
+    if (filtro === 'no_leidas') return !n.leido_en;
+    if (filtro === 'leidas')    return !!n.leido_en;
+    return n.tipo === filtro;
+  });
+
+  const noLeidas = notificaciones.filter(n => !n.leido_en).length;
+
+  return (
+    <div className="notif-page">
+      {/* Header */}
+      <div className="notif-page-header">
+        <div>
+          <h1><FiBell /> Notificaciones</h1>
+          {noLeidas > 0 && (
+            <span className="notif-page-badge">{noLeidas} sin leer</span>
+          )}
+        </div>
+        {noLeidas > 0 && (
+          <button className="btn-marcar-page" onClick={marcarTodasLeidas}>
+            <FiCheckCircle /> Marcar todas como leídas
+          </button>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div className="notif-filtros">
+        {[
+          { key: 'todas',     label: 'Todas' },
+          { key: 'no_leidas', label: 'Sin leer' },
+          { key: 'info',      label: 'Info' },
+          { key: 'warning',   label: 'Alertas' },
+          { key: 'success',   label: 'Éxito' },
+        ].map(f => (
+          <button
+            key={f.key}
+            className={`filtro-chip ${filtro === f.key ? 'active' : ''}`}
+            onClick={() => setFiltro(f.key)}
+          >
+            {f.label}
+            {f.key === 'no_leidas' && noLeidas > 0 && (
+              <span className="chip-badge">{noLeidas}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {cargando ? (
+        <div className="notif-page-loading">
+          <div className="spinner" />
+          <p>Cargando notificaciones...</p>
+        </div>
+      ) : filtradas.length === 0 ? (
+        <div className="notif-page-empty">
+          <FiBell size={48} style={{ opacity: 0.2 }} />
+          <p>No hay notificaciones {filtro !== 'todas' ? `en esta categoría` : ''}</p>
+        </div>
+      ) : (
+        <div className="notif-page-list">
+          {filtradas.map(notif => (
+            <div
+              key={notif.id}
+              className={`notif-page-item ${!notif.leido_en ? 'unread' : ''}`}
+              onClick={() => handleClick(notif)}
+            >
+              <div
+                className="notif-page-bar"
+                style={{ background: colorTipo[notif.tipo] ?? '#6b7280' }}
+              />
+              <div className="notif-page-icon">{iconoTipo[notif.tipo] ?? '🔔'}</div>
+
+              <div className="notif-page-body">
+                <div className="notif-page-top">
+                  <span className="notif-page-titulo">{notif.titulo}</span>
+                  <span className="notif-page-fecha">{formatearFecha(notif.creado_en)}</span>
+                </div>
+                <p className="notif-page-mensaje">{notif.mensaje}</p>
+                {notif.solicitud_id && (
+                  <span className="notif-page-link">Ver solicitud #{notif.solicitud_id} →</span>
+                )}
+              </div>
+
+              <div className="notif-page-btns" onClick={e => e.stopPropagation()}>
+                {!notif.leido_en && (
+                  <button
+                    className="btn-np-action"
+                    onClick={() => marcarLeida(notif.id)}
+                    title="Marcar como leída"
+                  >
+                    <FiCheck size={14} />
+                  </button>
+                )}
+                <button
+                  className="btn-np-action danger"
+                  onClick={() => eliminar(notif.id)}
+                  title="Eliminar"
+                >
+                  <FiTrash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default NotificacionesPage;

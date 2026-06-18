@@ -1,31 +1,50 @@
+// src/componentes/comunes/Navbar.jsx
+import CampanaNotificaciones from './CampanaNotificaciones';
 import './Navbar.css';
- import CampanaNotificaciones from './CampanaNotificaciones'; // Comentado hasta instalar react-icons
 
-const Navbar = ({ usuario, onLogout, onMenuClick }) => {
+const Navbar = ({ usuario, onLogout, onMenuClick, sidebarAbierto }) => {
   return (
     <nav className="navbar">
       <div className="navbar-content">
+
+        {/* ── Izquierda: hamburgesa + logo + título ── */}
         <div className="navbar-brand">
-          <button className="menu-toggle" onClick={onMenuClick}>
-            <span></span>
-            <span></span>
-            <span></span>
+          <button
+            className={`menu-toggle ${sidebarAbierto ? 'activo' : ''}`}
+            onClick={onMenuClick}
+            aria-label="Abrir menú"
+          >
+            <span />
+            <span />
+            <span />
           </button>
+
           <span className="navbar-logo">🏥</span>
-          <span className="navbar-title">Hospital Militar</span>
-        </div>
-        
-        <div className="navbar-user">
-          { CampanaNotificaciones && <CampanaNotificaciones /> }
-          
-          <div className="user-info">
-            <div className="user-name">{usuario?.nombre_completo || 'Usuario'}</div>
-            <div className="user-role">{usuario?.rol?.nombre} - {usuario?.grado}</div>
+
+          <div>
+            <span className="navbar-title">Hospital Militar</span>
+            <span className="navbar-subtitle">Mantenimiento</span>
           </div>
+        </div>
+
+        {/* ── Derecha: campana + usuario + cerrar sesión ── */}
+        <div className="navbar-user">
+          <CampanaNotificaciones />
+
+          <div className="user-info">
+            <div className="user-name">
+              {usuario?.nombre_completo || 'Usuario'}
+            </div>
+            <div className="user-role">
+              {usuario?.grado} · {usuario?.rol?.nombre?.replace('_', ' ')}
+            </div>
+          </div>
+
           <button onClick={onLogout} className="btn-logout">
-            Cerrar Sesión
+            Salir
           </button>
         </div>
+
       </div>
     </nav>
   );
