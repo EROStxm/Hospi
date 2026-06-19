@@ -202,3 +202,27 @@
 
   .sidebar-overlay { display: block; }
 }
+/* Botón de acción en sidebar (para items que no son rutas) */
+.sidebar-action-btn {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 20px;
+  color: #4b5563;
+  transition: background 0.15s, color 0.15s, border-left-color 0.15s;
+  border-left: 3px solid transparent;
+  margin: 1px 0;
+}
+
+.sidebar-action-btn:hover {
+  background: #f0f7ff;
+  color: #1e3a5f;
+  border-left-color: #93c5fd;
+}

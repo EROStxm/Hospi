@@ -8,17 +8,17 @@ const char* ssid = "OEEM1";
 const char* password = "4919044OEEM";
 
 // ========== CONFIGURACIÓN MQTT ==========
-//const char* mqtt_server = "192.168.0.10";
-const char* mqtt_server = "10.144.66.211";
+// ✅ CORREGIDO: Usar la IP correcta de tu PC
+const char* mqtt_server = "192.168.0.10";  // <- Cambia esto
 const int mqtt_port = 1883;
 const char* mqtt_topic_huellas = "hospital/huellas";
 const char* mqtt_topic_comandos = "hospital/comandos";
 
 // ========== PINES ==========
-#define RX_PIN      16
-#define TX_PIN      17
-#define TOUCH_PIN   4
-#define LED_PIN     2
+#define RX_PIN      16 //RX verde
+#define TX_PIN      17 //TX amarillo
+#define TOUCH_PIN   4  //azul
+#define LED_PIN     2  //blanco led
 
 HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
@@ -27,8 +27,8 @@ PubSubClient client(espClient);
 
 int currentUserId = 0;
 bool registrando = false;
-int pasoActual = 0;
 unsigned long lastReconnectAttempt = 0;
+unsigned long lastMqttAttempt = 0;
 
 // ========== SETUP ==========
 void setup() {
@@ -41,13 +41,20 @@ void setup() {
   // Conectar WiFi
   WiFi.begin(ssid, password);
   Serial.print("Conectando WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  int intentos = 0;
+  while (WiFi.status() != WL_CONNECTED && intentos < 30) {
     delay(500);
     Serial.print(".");
+    intentos++;
   }
-  Serial.println("\n✅ WiFi conectado!");
-  Serial.print("📡 IP: ");
-  Serial.println(WiFi.localIP());
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi conectado!");
+    Serial.print("📡 IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ Error de WiFi");
+  }
   
   // Configurar MQTT
   client.setServer(mqtt_server, mqtt_port);
@@ -57,17 +64,24 @@ void setup() {
   mySerial.begin(57600, SERIAL_8N1, RX_PIN, TX_PIN);
   finger.begin(57600);
   
+  delay(1000);  // Esperar que el sensor se estabilice
+  
   if (finger.verifyPassword()) {
     Serial.println("✅ Sensor AS608 detectado!");
   } else {
     Serial.println("❌ Sensor no encontrado!");
+    Serial.println("   Verifica las conexiones:");
+    Serial.println("   - Rojo (VCC) → 5V");
+    Serial.println("   - Negro (GND) → GND");
+    Serial.println("   - Amarillo (TX) → GPIO16 (RX2)");
+    Serial.println("   - Verde (RX) → GPIO17 (TX2)");
   }
   
   mostrarInfoSensor();
   Serial.println("\n📌 ESP32 LISTO - Esperando conexión MQTT...");
 }
 
-// ========== CALLBACK MQTT (recibe comandos) ==========
+// ========== CALLBACK MQTT ==========
 void callback(char* topic, byte* payload, unsigned int length) {
   String mensaje = "";
   for (int i = 0; i < length; i++) {
@@ -86,11 +100,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (comando == "registrar") {
       currentUserId = doc["user_id"];
       registrando = true;
-      
       Serial.print("📝 Registrando usuario ID: ");
       Serial.println(currentUserId);
-      
-      // Iniciar registro en función separada
       capturarHuella(currentUserId);
       registrando = false;
     }
@@ -294,7 +305,6 @@ int verificarHuella() {
     Serial.print(" | Confianza: ");
     Serial.println(finger.confidence);
     
-    // Publicar verificación exitosa
     StaticJsonDocument<200> doc;
     doc["tipo"] = "verificacion";
     doc["user_id"] = finger.fingerID;
@@ -304,7 +314,6 @@ int verificarHuella() {
     serializeJson(doc, output);
     client.publish(mqtt_topic_huellas, output.c_str());
     
-    // Feedback LED
     for (int i = 0; i < 2; i++) {
       digitalWrite(LED_PIN, HIGH);
       delay(100);
@@ -316,7 +325,6 @@ int verificarHuella() {
   
   Serial.println("❌ Huella NO registrada");
   
-  // Publicar verificación fallida
   StaticJsonDocument<200> doc;
   doc["tipo"] = "verificacion";
   doc["exito"] = false;
@@ -324,7 +332,6 @@ int verificarHuella() {
   serializeJson(doc, output);
   client.publish(mqtt_topic_huellas, output.c_str());
   
-  // Feedback error
   for (int i = 0; i < 3; i++) {
     digitalWrite(LED_PIN, HIGH);
     delay(50);
@@ -337,15 +344,18 @@ int verificarHuella() {
 // ========== RECONECTAR MQTT ==========
 void reconnectMQTT() {
   if (!client.connected()) {
-    Serial.print("🔄 Conectando a MQTT...");
+    Serial.print("🔄 Conectando a MQTT en ");
+    Serial.print(mqtt_server);
+    Serial.print(":");
+    Serial.print(mqtt_port);
+    Serial.print("...");
     
     if (client.connect("ESP32_Huellas_001")) {
-      Serial.println("✅ Conectado!");
+      Serial.println(" ✅ Conectado!");
       client.subscribe(mqtt_topic_comandos);
       Serial.print("📡 Suscrito a: ");
       Serial.println(mqtt_topic_comandos);
       
-      // Publicar estado online
       StaticJsonDocument<200> doc;
       doc["tipo"] = "conexion";
       doc["estado"] = "online";
@@ -356,8 +366,9 @@ void reconnectMQTT() {
       
       publicarInfoSensor();
     } else {
-      Serial.print("❌ Falló, rc=");
+      Serial.print(" ❌ Falló, rc=");
       Serial.println(client.state());
+      Serial.println("   Verifica que Mosquitto esté corriendo en la PC");
     }
   }
 }
@@ -370,16 +381,14 @@ void loop() {
   }
   client.loop();
   
-  // Detección automática de dedo (solo si no está registrando)
+  // Detección automática de dedo
   if (digitalRead(TOUCH_PIN) == LOW && !registrando) {
     delay(300);
     int id = verificarHuella();
     if (id > 0) {
       Serial.println("🔓 ACCESO CONCEDIDO");
-      Serial.println("=========================================");
     } else {
       Serial.println("🔒 ACCESO DENEGADO");
-      Serial.println("=========================================");
     }
     delay(1000);
   }

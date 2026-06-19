@@ -1,0 +1,79 @@
+/* src/componentes/comunes/CanvasFirma.css */
+
+.canvas-firma-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.canvas-firma-area {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: #fafafa;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none; /* evita scroll de la página al dibujar en móvil */
+}
+
+.canvas-firma {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.canvas-firma-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 13px;
+  pointer-events: none;
+  text-align: center;
+  padding: 0 20px;
+}
+
+.canvas-firma-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-firma-limpiar,
+.btn-firma-guardar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn-firma-limpiar {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.btn-firma-limpiar:hover:not(:disabled) { background: #e5e7eb; }
+
+.btn-firma-guardar {
+  background: linear-gradient(135deg, #1e3a5f, #2d5282);
+  color: white;
+}
+
+.btn-firma-guardar:hover:not(:disabled) { transform: translateY(-1px); }
+
+.btn-firma-limpiar:disabled,
+.btn-firma-guardar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

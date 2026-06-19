@@ -1,0 +1,6 @@
+# Terminal 1 - Laravel
+php artisan serve --host=0.0.0.0 --port=8000
+
+# Terminal 2 - Reverb WebSocket
+php artisan reverb:start --host=0.0.0.0 --port=8080
+

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\UbicacionController;
 use App\Http\Controllers\Api\NotificacionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\HuellaController;
+use App\Http\Controllers\Api\FirmaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -161,5 +162,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios/{id}/cambiar-password', [UserController::class, 'cambiarPassword']);
     Route::get('/sectores/{sectorId}/ubicaciones', [UbicacionController::class, 'porSector']);
     Route::get('/estadisticas', [SolicitudController::class, 'estadisticas']);
+    
+    // =============================================
+    // FIRMA DIGITAL
+    // =============================================
+    Route::get('/mi-firma', [FirmaController::class, 'miFirma']);
+    Route::post('/mi-firma', [FirmaController::class, 'guardar']);
+    Route::delete('/mi-firma', [FirmaController::class, 'eliminar']);
         
 });

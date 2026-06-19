@@ -9,17 +9,13 @@ import toast from 'react-hot-toast';
 import { 
   FiArrowLeft, FiCheckCircle, FiClock, FiAlertCircle, FiTool, 
   FiUser, FiMapPin, FiBox, FiCalendar, FiEdit2, FiCheck,
-  FiUserPlus, FiPackage, FiMessageCircle, FiSend, FiX
+  FiUserPlus, FiPackage, FiMessageCircle, FiSend, FiX,
+  FiDownload, FiCode
 } from 'react-icons/fi';
 import '../estilos/detalle-solicitud.css';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
-
 import SubirImagenes from '../componentes/comunes/SubirImagenes';
-
-// Cambiar esta línea:
-// Por:
-import { FiDownload, FiCode } from 'react-icons/fi';
-// O usa: import { FiDownload, FiGrid } from 'react-icons/fi';
+import ModalFirma from '../componentes/comunes/ModalFirma';
 
 const DetalleSolicitudPage = () => {
   const { id } = useParams();
@@ -38,6 +34,7 @@ const DetalleSolicitudPage = () => {
   const [mostrarModalMateriales, setMostrarModalMateriales] = useState(false);
   const [mostrarModalConformidad, setMostrarModalConformidad] = useState(false);
   const [mostrarModalQr, setMostrarModalQr] = useState(false);
+  const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
   
   // Estados para formularios
   const [tecnicoSeleccionado, setTecnicoSeleccionado] = useState('');
@@ -47,6 +44,7 @@ const DetalleSolicitudPage = () => {
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [cargandoAccion, setCargandoAccion] = useState(false);
   const [qrCode, setQrCode] = useState(null);
+  const [accionPendiente, setAccionPendiente] = useState(null);
 
   const estadosConfig = {
     pendiente_solicitante: { label: 'Pendiente Solicitante', color: '#f59e0b', icon: <FiClock /> },
@@ -68,8 +66,8 @@ const DetalleSolicitudPage = () => {
     cargarMateriales();
     cargarSectores();
   }, [id]);
-  // 🔴 Auto-refresh: si alguien firma, asigna técnico, o cambia el estado
-  // de ESTA solicitud específica desde otra sesión, se actualiza sola.
+
+  // Auto-refresh
   useAutoRefresh(
     () => cargarSolicitud(),
     { soloSiSolicitudId: parseInt(id) }
@@ -118,7 +116,6 @@ const DetalleSolicitudPage = () => {
     }
   };
 
-  // ← FUNCIÓN AGREGADA PARA CARGAR SECTORES
   const cargarSectores = async () => {
     try {
       const response = await sectorService.obtenerTodos();
@@ -192,71 +189,130 @@ const DetalleSolicitudPage = () => {
   };
 
   // =============================================
-  // ACCIONES
+  // ACCIONES CON FIRMA
   // =============================================
 
-  const handleFirmarSolicitante = async () => {
+  const ejecutarConFirma = async (accion) => {
     try {
-      setCargandoAccion(true);
-      const response = await solicitudService.firmar(id);
-      if (response.success) {
-        toast.success('Solicitud firmada correctamente');
-        cargarSolicitud();
-      }
+      await accion();
     } catch (error) {
-      toast.error('Error al firmar la solicitud');
-    } finally {
-      setCargandoAccion(false);
+      if (error?.response?.status === 422 && error?.response?.data?.requiere_firma) {
+        setAccionPendiente(() => accion);
+        setMostrarModalFirma(true);
+      } else {
+        throw error;
+      }
     }
+  };
+
+  const handleFirmaCompletada = () => {
+    setMostrarModalFirma(false);
+    if (accionPendiente) {
+      accionPendiente();
+      setAccionPendiente(null);
+    }
+  };
+
+  // Firmar como solicitante
+  const handleFirmarSolicitante = async () => {
+    await ejecutarConFirma(async () => {
+      try {
+        setCargandoAccion(true);
+        const response = await solicitudService.firmar(id);
+        if (response.success) {
+          toast.success('Solicitud firmada correctamente');
+          cargarSolicitud();
+        }
+      } catch (error) {
+        if (error?.response?.data?.requiere_firma) throw error;
+        toast.error('Error al firmar la solicitud');
+      } finally {
+        setCargandoAccion(false);
+      }
+    });
   };
 
   // Firmar como jefe sección
   const handleFirmarJefeSeccion = async () => {
-    try {
-      setCargandoAccion(true);
-      const response = await solicitudService.firmar(id);
-      if (response.success) {
-        toast.success('Firma registrada correctamente');
-        cargarSolicitud();
+    await ejecutarConFirma(async () => {
+      try {
+        setCargandoAccion(true);
+        const response = await solicitudService.firmar(id);
+        if (response.success) {
+          toast.success('Firma registrada correctamente');
+          cargarSolicitud();
+        }
+      } catch (error) {
+        if (error?.response?.data?.requiere_firma) throw error;
+        toast.error('Error al firmar');
+      } finally {
+        setCargandoAccion(false);
       }
-    } catch (error) {
-      toast.error('Error al firmar');
-    } finally {
-      setCargandoAccion(false);
-    }
+    });
   };
 
   // Firmar como jefe activos
   const handleFirmarJefeActivos = async () => {
-    try {
-      setCargandoAccion(true);
-      const response = await solicitudService.firmar(id);
-      if (response.success) {
-        toast.success('Firma registrada correctamente');
-        cargarSolicitud();
+    await ejecutarConFirma(async () => {
+      try {
+        setCargandoAccion(true);
+        const response = await solicitudService.firmar(id);
+        if (response.success) {
+          toast.success('Firma registrada correctamente');
+          cargarSolicitud();
+        }
+      } catch (error) {
+        if (error?.response?.data?.requiere_firma) throw error;
+        toast.error('Error al firmar');
+      } finally {
+        setCargandoAccion(false);
       }
-    } catch (error) {
-      toast.error('Error al firmar');
-    } finally {
-      setCargandoAccion(false);
-    }
+    });
   };
 
   // Firmar como jefe de mantenimiento
   const handleFirmarJefeMantenimiento = async () => {
-    try {
-      setCargandoAccion(true);
-      const response = await solicitudService.firmar(id);
-      if (response.success) {
-        toast.success('Solicitud cerrada correctamente');
-        cargarSolicitud();
+    await ejecutarConFirma(async () => {
+      try {
+        setCargandoAccion(true);
+        const response = await solicitudService.firmar(id);
+        if (response.success) {
+          toast.success('Solicitud cerrada correctamente');
+          cargarSolicitud();
+        }
+      } catch (error) {
+        if (error?.response?.data?.requiere_firma) throw error;
+        toast.error('Error al cerrar la solicitud');
+      } finally {
+        setCargandoAccion(false);
       }
-    } catch (error) {
-      toast.error('Error al cerrar la solicitud');
-    } finally {
-      setCargandoAccion(false);
-    }
+    });
   };
+
+  // Dar conformidad
+  const handleDarConformidad = async () => {
+    await ejecutarConFirma(async () => {
+      try {
+        setCargandoAccion(true);
+        const response = await solicitudService.firmar(id, comentarioConformidad || 'Trabajo conforme');
+        if (response.success) {
+          toast.success('Conformidad registrada correctamente');
+          setMostrarModalConformidad(false);
+          setComentarioConformidad('');
+          cargarSolicitud();
+        }
+      } catch (error) {
+        if (error?.response?.data?.requiere_firma) throw error;
+        toast.error('Error al dar conformidad');
+      } finally {
+        setCargandoAccion(false);
+      }
+    });
+  };
+
+  // =============================================
+  // OTRAS ACCIONES
+  // =============================================
 
   // Asignar técnico
   const handleAsignarTecnico = async () => {
@@ -299,24 +355,6 @@ const DetalleSolicitudPage = () => {
       }
     } catch (error) {
       toast.error('Error al completar trabajo');
-    } finally {
-      setCargandoAccion(false);
-    }
-  };
-
-  // Dar conformidad
-  const handleDarConformidad = async () => {
-    try {
-      setCargandoAccion(true);
-      const response = await solicitudService.firmar(id, comentarioConformidad || 'Trabajo conforme');
-      if (response.success) {
-        toast.success('Conformidad registrada correctamente');
-        setMostrarModalConformidad(false);
-        setComentarioConformidad('');
-        cargarSolicitud();
-      }
-    } catch (error) {
-      toast.error('Error al dar conformidad');
     } finally {
       setCargandoAccion(false);
     }
@@ -974,6 +1012,15 @@ const DetalleSolicitudPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL: Registrar/usar firma digital */}
+      {mostrarModalFirma && (
+        <ModalFirma
+          obligatorio
+          onClose={() => setMostrarModalFirma(false)}
+          onFirmaLista={handleFirmaCompletada}
+        />
       )}
     </div>
   );

@@ -1,5 +1,4 @@
 <?php
-// database/migrations/2026_06_18_000001_add_firma_digital_to_usuarios.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -9,17 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Cambiar de longText a varchar (solo guardaremos la ruta)
         Schema::table('usuarios', function (Blueprint $table) {
-            // Guarda el PNG de la firma como base64 (data URI completo)
-            $table->longText('firma_digital')->nullable()->after('huella_registrada_en');
-            $table->timestamp('firma_registrada_en')->nullable()->after('firma_digital');
+            $table->string('firma_digital', 500)->nullable()->change();
         });
     }
 
     public function down(): void
     {
         Schema::table('usuarios', function (Blueprint $table) {
-            $table->dropColumn(['firma_digital', 'firma_registrada_en']);
+            $table->longText('firma_digital')->nullable()->change();
         });
     }
 };

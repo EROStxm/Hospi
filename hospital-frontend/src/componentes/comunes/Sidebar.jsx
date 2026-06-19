@@ -66,11 +66,12 @@ const Sidebar = ({ usuario, isOpen, onClose }) => {
     });
   }
 
-  // Notificaciones al final para todos
+  // Cuenta al final para todos
   grupos.push({
     label: 'Cuenta',
     items: [
-      { path: '/notificaciones', icon: '🔔', label: 'Notificaciones' },
+      { path: '/notificaciones',           icon: '🔔', label: 'Notificaciones' },
+      { action: 'abrir-firma', path: null, icon: '✍️', label: 'Mi Firma' },
     ],
   });
   // ────────────────────────────────────────────────────────────────
@@ -109,20 +110,40 @@ const Sidebar = ({ usuario, isOpen, onClose }) => {
         </div>
 
         {/* Grupos de menú */}
-        {grupos.map((grupo) => (
-          <div className="sidebar-group" key={grupo.label}>
+        {grupos.map((grupo, gIdx) => (
+          <div className="sidebar-group" key={gIdx}>
             <div className="sidebar-group-label">{grupo.label}</div>
-            {grupo.items.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-                onClick={handleItemClick}
-              >
-                <span className="sidebar-icon">{item.icon}</span>
-                <span className="sidebar-text">{item.label}</span>
-              </Link>
-            ))}
+            {grupo.items.map((item, iIdx) => {
+              // Si es una acción (no ruta), renderizar botón
+              if (item.action) {
+                return (
+                  <button
+                    key={item.action}
+                    className="sidebar-item sidebar-action-btn"
+                    onClick={() => {
+                      handleItemClick();
+                      window.dispatchEvent(new CustomEvent('abrir-modal-firma'));
+                    }}
+                  >
+                    <span className="sidebar-icon">{item.icon}</span>
+                    <span className="sidebar-text">{item.label}</span>
+                  </button>
+                );
+              }
+              
+              // Si es una ruta normal, renderizar Link
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
+                  onClick={handleItemClick}
+                >
+                  <span className="sidebar-icon">{item.icon}</span>
+                  <span className="sidebar-text">{item.label}</span>
+                </Link>
+              );
+            })}
           </div>
         ))}
 
