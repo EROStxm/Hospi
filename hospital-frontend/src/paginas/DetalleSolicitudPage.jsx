@@ -17,6 +17,8 @@ import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import SubirImagenes from '../componentes/comunes/SubirImagenes';
 import ModalFirma from '../componentes/comunes/ModalFirma';
 
+import api from '../servicios/api';
+
 const DetalleSolicitudPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -205,11 +207,22 @@ const DetalleSolicitudPage = () => {
     }
   };
 
-  const handleFirmaCompletada = () => {
+  const handleFirmaCompletada = async () => {
     setMostrarModalFirma(false);
+    console.log('🔍 accionPendiente:', accionPendiente);
     if (accionPendiente) {
-      accionPendiente();
-      setAccionPendiente(null);
+      setTimeout(async () => {
+        try {
+          console.log('🔄 Reintentando firma...');
+          await accionPendiente();
+          console.log('✅ Firma completada');
+          cargarSolicitud(); // Recargar datos
+        } catch (e) {
+          console.error('❌ Error al reintentar firma:', e);
+          toast.error('Error al firmar. Intente de nuevo.');
+        }
+        setAccionPendiente(null);
+      }, 800);
     }
   };
 
@@ -458,6 +471,22 @@ const DetalleSolicitudPage = () => {
       toast.error('Error al generar código QR', { id: 'qr' });
     }
   };
+  // Función (después de handleVerQr)
+  const handleAgregarFirmasPdf = async () => {
+    try {
+      setCargandoAccion(true);
+      const response = await api.post(`/solicitudes/${id}/agregar-firmas`);
+      if (response.data.success) {
+        toast.success('✅ Firmas agregadas al PDF correctamente');
+        cargarSolicitud();
+      }
+    } catch (error) {
+      toast.error('Error al agregar firmas');
+    } finally {
+      setCargandoAccion(false);
+    }
+  };
+
 
   if (cargando) {
     return (
@@ -600,6 +629,11 @@ const DetalleSolicitudPage = () => {
 
             <button className="btn-accion btn-qr" onClick={handleVerQr}>
               <FiCode /> Ver QR
+            </button>
+            
+            {/* Botón para agregar firmas al PDF */}
+            <button className="btn-accion btn-firma" onClick={handleAgregarFirmasPdf} disabled={cargandoAccion}>
+              <FiEdit2 /> Agregar Firmas al PDF
             </button>
           </div>
         </div>

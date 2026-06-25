@@ -324,11 +324,8 @@ class SolicitudController extends Controller
         $solicitud = Solicitud::findOrFail($id);
         $user = $request->user();
         $nuevoEstado = '';
- 
-        // 🔴 Validar que el usuario tenga una firma digital registrada
-        // ANTES de permitir cualquier firma (excepto en el paso de
-        // conformidad, que es más una confirmación que una firma legal,
-        // pero la incluimos también por consistencia).
+
+        // Validar que el usuario tenga una firma digital registrada
         if (!$user->tieneFirma()) {
             return response()->json([
                 'success' => false,
@@ -336,22 +333,25 @@ class SolicitudController extends Controller
                 'requiere_firma' => true
             ], 422);
         }
- 
+
+        // Obtener la firma directamente del modelo User (no de DB::table)
+        $firmaDigital = $user->firma_digital;
+
         switch ($solicitud->estado) {
             case 'pendiente_solicitante':
                 if ($solicitud->solicitante_id !== $user->id) {
                     return response()->json(['message' => 'Solo el solicitante puede firmar'], 403);
                 }
- 
+
                 $solicitud->update([
                     'solicitante_firmo_en' => now(),
                     'solicitante_ip' => $request->ip(),
                     'solicitante_dispositivo' => $request->header('User-Agent'),
-                    'solicitante_firma_imagen' => $user->firma_digital, // snapshot
+                    'solicitante_firma_imagen' => $firmaDigital,
                     'estado' => 'pendiente_jefe_seccion'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_seccion';
- 
+
                 NotificacionHelper::enviarAJefeServicio(
                     $solicitud->sector_id,
                     'Nueva solicitud para firmar',
@@ -361,21 +361,21 @@ class SolicitudController extends Controller
                     $solicitud->id
                 );
                 break;
- 
+
             case 'pendiente_jefe_seccion':
                 if (!$user->rol->puede_aprobar_material || $solicitud->sector_id !== $user->sector_id) {
                     return response()->json(['message' => 'No autorizado para firmar. Debe ser Jefe de Servicio del sector'], 403);
                 }
- 
+
                 $solicitud->update([
                     'jefe_seccion_firmo_en' => now(),
                     'jefe_seccion_id' => $user->id,
                     'jefe_seccion_ip' => $request->ip(),
-                    'jefe_seccion_firma_imagen' => $user->firma_digital,
+                    'jefe_seccion_firma_imagen' => $firmaDigital,
                     'estado' => 'pendiente_jefe_activos'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_activos';
- 
+
                 NotificacionHelper::enviarAJefeSoporte(
                     'Solicitud lista para autorizar',
                     "La solicitud #{$solicitud->id} de {$solicitud->solicitante->nombre_completo} requiere autorización de Jefe de Soporte",
@@ -383,7 +383,7 @@ class SolicitudController extends Controller
                     "/solicitudes-pendientes",
                     $solicitud->id
                 );
- 
+
                 NotificacionHelper::enviar(
                     $solicitud->solicitante_id,
                     'Solicitud aprobada por Jefe de Servicio',
@@ -393,21 +393,21 @@ class SolicitudController extends Controller
                     $solicitud->id
                 );
                 break;
- 
+
             case 'pendiente_jefe_activos':
                 if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
                     return response()->json(['message' => 'No autorizado. Debe ser Jefe de Soporte o Admin'], 403);
                 }
- 
+
                 $solicitud->update([
                     'jefe_activos_firmo_en' => now(),
                     'jefe_activos_id' => $user->id,
                     'jefe_activos_ip' => $request->ip(),
-                    'jefe_activos_firma_imagen' => $user->firma_digital,
+                    'jefe_activos_firma_imagen' => $firmaDigital,
                     'estado' => 'pendiente_soporte'
                 ]);
                 $nuevoEstado = 'pendiente_soporte';
- 
+
                 NotificacionHelper::enviarATecnicos(
                     'Nueva solicitud disponible',
                     "La solicitud #{$solicitud->id} está lista para ser atendida por Soporte Técnico",
@@ -415,7 +415,7 @@ class SolicitudController extends Controller
                     "/mis-trabajos",
                     $solicitud->id
                 );
- 
+
                 NotificacionHelper::enviar(
                     $solicitud->solicitante_id,
                     'Solicitud autorizada',
@@ -425,22 +425,22 @@ class SolicitudController extends Controller
                     $solicitud->id
                 );
                 break;
- 
+
             case 'pendiente_conformacion':
                 if ($solicitud->solicitante_id !== $user->id) {
                     return response()->json(['message' => 'Solo el solicitante puede dar conformidad'], 403);
                 }
- 
+
                 $solicitud->update([
                     'conformacion_firmo_en' => now(),
                     'conformacion_id' => $user->id,
                     'conformacion_ip' => $request->ip(),
                     'conformacion_comentario' => $request->comentario ?? 'Trabajo conforme',
-                    'conformacion_firma_imagen' => $user->firma_digital,
+                    'conformacion_firma_imagen' => $firmaDigital,
                     'estado' => 'pendiente_jefe_mantenimiento'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_mantenimiento';
- 
+
                 NotificacionHelper::enviarAJefeSoporte(
                     'Trabajo pendiente de cierre',
                     "La solicitud #{$solicitud->id} está pendiente de su firma para completar el proceso",
@@ -448,7 +448,7 @@ class SolicitudController extends Controller
                     "/solicitudes-pendientes",
                     $solicitud->id
                 );
- 
+
                 if ($solicitud->tecnico_asignado_id) {
                     NotificacionHelper::enviar(
                         $solicitud->tecnico_asignado_id,
@@ -460,21 +460,21 @@ class SolicitudController extends Controller
                     );
                 }
                 break;
- 
+
             case 'pendiente_jefe_mantenimiento':
                 if (!in_array($user->rol->nombre, ['jefe_soporte', 'admin_sistema'])) {
                     return response()->json(['message' => 'No autorizado. Debe ser Jefe de Soporte o Admin'], 403);
                 }
- 
+
                 $solicitud->update([
                     'jefe_mantenimiento_firmo_en' => now(),
                     'jefe_mantenimiento_id' => $user->id,
                     'jefe_mantenimiento_ip' => $request->ip(),
-                    'jefe_mantenimiento_firma_imagen' => $user->firma_digital,
+                    'jefe_mantenimiento_firma_imagen' => $firmaDigital,
                     'estado' => 'completado'
                 ]);
                 $nuevoEstado = 'completado';
- 
+
                 NotificacionHelper::enviar(
                     $solicitud->solicitante_id,
                     'Solicitud completada ✅',
@@ -483,7 +483,7 @@ class SolicitudController extends Controller
                     "/mis-solicitudes",
                     $solicitud->id
                 );
- 
+
                 if ($solicitud->tecnico_asignado_id) {
                     NotificacionHelper::enviar(
                         $solicitud->tecnico_asignado_id,
@@ -495,20 +495,42 @@ class SolicitudController extends Controller
                     );
                 }
                 break;
- 
+
             default:
                 return response()->json(['message' => 'No se puede firmar en el estado: ' . $solicitud->estado], 400);
         }
- 
+
         $solicitud->load(['solicitante', 'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion']);
- 
+
         return response()->json([
             'success' => true,
             'message' => 'Firma registrada correctamente',
             'data' => $solicitud
         ]);
     }
- 
+
+
+    public function agregarFirmas($id)
+    {
+        $solicitud = Solicitud::findOrFail($id);
+        
+        // Usar el modelo User en lugar de DB::table para obtener las firmas
+        $solicitante = User::find($solicitud->solicitante_id);
+        $jefeSeccion = User::find($solicitud->jefe_seccion_id);
+        $jefeActivos = User::find($solicitud->jefe_activos_id);
+        $conformacion = User::find($solicitud->conformacion_id ?? $solicitud->solicitante_id);
+        $jefeMantenimiento = User::find($solicitud->jefe_mantenimiento_id);
+        
+        $solicitud->update([
+            'solicitante_firma_imagen' => $solicitante ? $solicitante->firma_digital : null,
+            'jefe_seccion_firma_imagen' => $jefeSeccion ? $jefeSeccion->firma_digital : null,
+            'jefe_activos_firma_imagen' => $jefeActivos ? $jefeActivos->firma_digital : null,
+            'conformacion_firma_imagen' => $conformacion ? $conformacion->firma_digital : null,
+            'jefe_mantenimiento_firma_imagen' => $jefeMantenimiento ? $jefeMantenimiento->firma_digital : null,
+        ]);
+        
+        return response()->json(['success' => true, 'message' => 'Firmas actualizadas']);
+    }
     /**
      * Asignar técnico
      */
@@ -519,6 +541,7 @@ class SolicitudController extends Controller
         ]);
 
         $solicitud = Solicitud::findOrFail($id);
+        $tecnico = User::find($request->tecnico_id);
         
         $solicitud->update([
             'tecnico_asignado_id' => $request->tecnico_id,
@@ -817,132 +840,62 @@ class SolicitudController extends Controller
         ]);
     }
 
-        
-    /**
-     * Generar PDF de la solicitud completada
-     *//*
-    public function generarPdf($id, Request $request)
-    {
-        $solicitud = Solicitud::with([
-            'solicitante', 'sector', 'equipo', 'tecnicoAsignado',
-            'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion'
-        ])->findOrFail($id);
-        
-        $user = $request->user();
-        
-        // Verificar permisos (solo admin, jefe soporte o solicitante)
-        if (!in_array($user->rol->nombre, ['admin_sistema', 'jefe_soporte']) && 
-            $solicitud->solicitante_id !== $user->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
-        
-        // Generar QR con los datos de la solicitud
-        $qrData = [
-            'id' => $solicitud->id,
-            'titulo' => $solicitud->titulo,
-            'estado' => $solicitud->estado,
-            'solicitante' => $solicitud->solicitante->nombre_completo,
-            'fecha' => $solicitud->creado_en->format('d/m/Y H:i')
-        ];
-        
-        $qrCode = base64_encode(QrCode::format('png')->size(200)->generate(json_encode($qrData)));
-        
-        // Datos para el PDF
-        $data = [
-            'solicitud' => $solicitud,
-            'qrCode' => $qrCode,
-            'fechaGeneracion' => now()->format('d/m/Y H:i:s')
-        ];
-        
-        // Generar PDF
-        $pdf = Pdf::loadView('pdf.solicitud', $data);
-        $pdf->setPaper('a4', 'portrait');
-        
-        // Guardar PDF en storage
-        $pdfPath = 'solicitudes/pdf/solicitud_' . $solicitud->id . '_' . time() . '.pdf';
-        $pdfContent = $pdf->output();
-        Storage::disk('public')->put($pdfPath, $pdfContent);
-        
-        // Actualizar en la base de datos
-        $solicitud->update([
-            'pdf_generado_en' => now(),
-            'pdf_ruta' => '/storage/' . $pdfPath
-        ]);
-        
-        // Devolver el PDF para descargar
-        return $pdf->download("solicitud_{$solicitud->id}.pdf");
-    }*/
-    /**
-     * Generar PDF de la solicitud (VERSIÓN DE PRUEBA)
-     */
+
     public function generarPdf($id, Request $request)
     {
         try {
-            // Cargar TODAS las relaciones necesarias para las 6 firmas
             $solicitud = Solicitud::with([
-                'solicitante',
-                'sector',
-                'equipo',
-                'tecnicoAsignado',
-                'jefeSeccion',       // Firma 2
-                'jefeActivos',       // Firma 3
-                'jefeMantenimiento', // Firma 6
-                'conformacion',      // Firma 5
+                'solicitante', 'sector', 'equipo', 'tecnicoAsignado',
+                'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion',
             ])->findOrFail($id);
 
-            $user = $request->user();
+            $qrCode = QrCode::create("Solicitud #{$solicitud->id}\n{$solicitud->titulo}")
+                ->setSize(200)->setMargin(10);
+            $writer = new PngWriter();
+            $qrBase64 = base64_encode($writer->write($qrCode)->getString());
 
-            // Generar QR
-            $qrText = "Solicitud #{$solicitud->id}\n";
-            $qrText .= "Título: {$solicitud->titulo}\n";
-            $qrText .= "Estado: " . str_replace('_', ' ', $solicitud->estado) . "\n";
-            $qrText .= "URL: " . url("/solicitudes/{$solicitud->id}");
-
-            $qrCode = \Endroid\QrCode\QrCode::create($qrText)
-                ->setSize(200)
-                ->setMargin(10);
-
-            $writer = new \Endroid\QrCode\Writer\PngWriter();
-            $qrResult = $writer->write($qrCode);
-            $qrBase64 = base64_encode($qrResult->getString());
-
-            // Datos para vista
             $data = [
                 'solicitud' => $solicitud,
                 'qrCode' => $qrBase64,
-                'fechaGeneracion' => now()->format('d/m/Y H:i')
+                'fechaGeneracion' => now()->format('d/m/Y H:i'),
             ];
 
-            // Renderizar vista Blade
             $html = view('pdf.solicitud', $data)->render();
 
-            // Generar PDF
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)
+            $pdf = Pdf::loadHTML($html)
                 ->setPaper('a4', 'portrait')
                 ->setOptions([
                     'isHtml5ParserEnabled' => true,
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'defaultFont' => 'DejaVu Sans'
                 ]);
 
-            // Guardar
             $pdfPath = 'solicitudes/pdf/solicitud_' . $solicitud->id . '_' . time() . '.pdf';
-            \Illuminate\Support\Facades\Storage::disk('public')->put($pdfPath, $pdf->output());
+            Storage::disk('public')->put($pdfPath, $pdf->output());
 
-            $solicitud->update([
-                'pdf_generado_en' => now(),
-                'pdf_ruta' => '/storage/' . $pdfPath
-            ]);
+            $solicitud->update(['pdf_generado_en' => now(), 'pdf_ruta' => '/storage/' . $pdfPath]);
 
             return $pdf->download("solicitud_{$solicitud->id}.pdf");
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error PDF: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al generar PDF: ' . $e->getMessage()
-            ], 500);
+            Log::error('Error PDF: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }
+    }
+
+    // Método auxiliar
+    private function convertirRutaABase64($ruta)
+    {
+        if (!$ruta) return null;
+        
+        $rutaLimpia = str_replace('/storage/', '', $ruta);
+        
+        if (Storage::disk('public')->exists($rutaLimpia)) {
+            $contenido = Storage::disk('public')->get($rutaLimpia);
+            return 'data:image/png;base64,' . base64_encode($contenido);
+        }
+        
+        return null;
     }
 
 

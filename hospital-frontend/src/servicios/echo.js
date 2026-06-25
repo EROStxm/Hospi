@@ -8,7 +8,7 @@ window.Pusher = Pusher;
 const reverbHost   = import.meta.env.VITE_REVERB_HOST   || window.location.hostname;
 const reverbPort   = import.meta.env.VITE_REVERB_PORT   || 8080;
 const reverbScheme = import.meta.env.VITE_REVERB_SCHEME || 'http';
-const reverbKey    = import.meta.env.VITE_REVERB_APP_KEY || 'hospital-key-2024';
+const reverbKey = import.meta.env.VITE_REVERB_APP_KEY || 'q7siqytufkhm8cfor7wq';
 
 let echoInstance = null;
 

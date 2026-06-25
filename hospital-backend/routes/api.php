@@ -169,5 +169,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mi-firma', [FirmaController::class, 'miFirma']);
     Route::post('/mi-firma', [FirmaController::class, 'guardar']);
     Route::delete('/mi-firma', [FirmaController::class, 'eliminar']);
+    Route::post('/solicitudes/{id}/agregar-firmas', [App\Http\Controllers\Api\SolicitudController::class, 'agregarFirmas']);
         
 });

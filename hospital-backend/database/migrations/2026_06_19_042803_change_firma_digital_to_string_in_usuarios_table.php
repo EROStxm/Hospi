@@ -1,5 +1,5 @@
 <?php
-
+// database/migrations/2026_06_19_043502_add_firma_imagen_columns_to_solicitudes_table.php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

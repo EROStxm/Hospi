@@ -1,5 +1,5 @@
 <?php
-
+// database/migrations/2026_06_18_205953_add_firma_digital_to_usuarios_table.php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
