@@ -325,7 +325,6 @@ class SolicitudController extends Controller
         $user = $request->user();
         $nuevoEstado = '';
 
-        // Validar que el usuario tenga una firma digital registrada
         if (!$user->tieneFirma()) {
             return response()->json([
                 'success' => false,
@@ -334,8 +333,15 @@ class SolicitudController extends Controller
             ], 422);
         }
 
-        // Obtener la firma directamente del modelo User (no de DB::table)
+        // ⚠️ ESTA ES LA LÍNEA CLAVE - Obtener la firma DIRECTAMENTE del modelo
         $firmaDigital = $user->firma_digital;
+        
+        // Debug temporal para ver qué valor tiene
+        Log::info('Firma digital obtenida:', [
+            'user_id' => $user->id,
+            'firma' => $firmaDigital,
+            'firma_null' => is_null($firmaDigital)
+        ]);
 
         switch ($solicitud->estado) {
             case 'pendiente_solicitante':
@@ -343,23 +349,15 @@ class SolicitudController extends Controller
                     return response()->json(['message' => 'Solo el solicitante puede firmar'], 403);
                 }
 
+                // ✅ USAR $firmaDigital, NO DB::table(...)
                 $solicitud->update([
                     'solicitante_firmo_en' => now(),
                     'solicitante_ip' => $request->ip(),
                     'solicitante_dispositivo' => $request->header('User-Agent'),
-                    'solicitante_firma_imagen' => $firmaDigital,
+                    'solicitante_firma_imagen' => $firmaDigital, // ← AQUÍ
                     'estado' => 'pendiente_jefe_seccion'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_seccion';
-
-                NotificacionHelper::enviarAJefeServicio(
-                    $solicitud->sector_id,
-                    'Nueva solicitud para firmar',
-                    "La solicitud #{$solicitud->id} de {$solicitud->solicitante->nombre_completo} requiere su firma como Jefe de Servicio",
-                    'warning',
-                    "/para-firmar",
-                    $solicitud->id
-                );
                 break;
 
             case 'pendiente_jefe_seccion':
@@ -371,27 +369,10 @@ class SolicitudController extends Controller
                     'jefe_seccion_firmo_en' => now(),
                     'jefe_seccion_id' => $user->id,
                     'jefe_seccion_ip' => $request->ip(),
-                    'jefe_seccion_firma_imagen' => $firmaDigital,
+                    'jefe_seccion_firma_imagen' => $firmaDigital, // ← AQUÍ
                     'estado' => 'pendiente_jefe_activos'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_activos';
-
-                NotificacionHelper::enviarAJefeSoporte(
-                    'Solicitud lista para autorizar',
-                    "La solicitud #{$solicitud->id} de {$solicitud->solicitante->nombre_completo} requiere autorización de Jefe de Soporte",
-                    'info',
-                    "/solicitudes-pendientes",
-                    $solicitud->id
-                );
-
-                NotificacionHelper::enviar(
-                    $solicitud->solicitante_id,
-                    'Solicitud aprobada por Jefe de Servicio',
-                    "Tu solicitud #{$solicitud->id} ha sido aprobada por tu Jefe de Servicio y enviada a Soporte Técnico",
-                    'success',
-                    "/mis-solicitudes",
-                    $solicitud->id
-                );
                 break;
 
             case 'pendiente_jefe_activos':
@@ -403,27 +384,10 @@ class SolicitudController extends Controller
                     'jefe_activos_firmo_en' => now(),
                     'jefe_activos_id' => $user->id,
                     'jefe_activos_ip' => $request->ip(),
-                    'jefe_activos_firma_imagen' => $firmaDigital,
+                    'jefe_activos_firma_imagen' => $firmaDigital, // ← AQUÍ
                     'estado' => 'pendiente_soporte'
                 ]);
                 $nuevoEstado = 'pendiente_soporte';
-
-                NotificacionHelper::enviarATecnicos(
-                    'Nueva solicitud disponible',
-                    "La solicitud #{$solicitud->id} está lista para ser atendida por Soporte Técnico",
-                    'info',
-                    "/mis-trabajos",
-                    $solicitud->id
-                );
-
-                NotificacionHelper::enviar(
-                    $solicitud->solicitante_id,
-                    'Solicitud autorizada',
-                    "Tu solicitud #{$solicitud->id} ha sido autorizada y está pendiente de asignación a un técnico",
-                    'info',
-                    "/mis-solicitudes",
-                    $solicitud->id
-                );
                 break;
 
             case 'pendiente_conformacion':
@@ -436,29 +400,10 @@ class SolicitudController extends Controller
                     'conformacion_id' => $user->id,
                     'conformacion_ip' => $request->ip(),
                     'conformacion_comentario' => $request->comentario ?? 'Trabajo conforme',
-                    'conformacion_firma_imagen' => $firmaDigital,
+                    'conformacion_firma_imagen' => $firmaDigital, // ← AQUÍ
                     'estado' => 'pendiente_jefe_mantenimiento'
                 ]);
                 $nuevoEstado = 'pendiente_jefe_mantenimiento';
-
-                NotificacionHelper::enviarAJefeSoporte(
-                    'Trabajo pendiente de cierre',
-                    "La solicitud #{$solicitud->id} está pendiente de su firma para completar el proceso",
-                    'warning',
-                    "/solicitudes-pendientes",
-                    $solicitud->id
-                );
-
-                if ($solicitud->tecnico_asignado_id) {
-                    NotificacionHelper::enviar(
-                        $solicitud->tecnico_asignado_id,
-                        'Trabajo conforme',
-                        "El solicitante ha dado conformidad al trabajo realizado en la solicitud #{$solicitud->id}",
-                        'success',
-                        "/mis-trabajos",
-                        $solicitud->id
-                    );
-                }
                 break;
 
             case 'pendiente_jefe_mantenimiento':
@@ -470,30 +415,10 @@ class SolicitudController extends Controller
                     'jefe_mantenimiento_firmo_en' => now(),
                     'jefe_mantenimiento_id' => $user->id,
                     'jefe_mantenimiento_ip' => $request->ip(),
-                    'jefe_mantenimiento_firma_imagen' => $firmaDigital,
+                    'jefe_mantenimiento_firma_imagen' => $firmaDigital, // ← AQUÍ
                     'estado' => 'completado'
                 ]);
                 $nuevoEstado = 'completado';
-
-                NotificacionHelper::enviar(
-                    $solicitud->solicitante_id,
-                    'Solicitud completada ✅',
-                    "Tu solicitud #{$solicitud->id} ha sido completada exitosamente",
-                    'success',
-                    "/mis-solicitudes",
-                    $solicitud->id
-                );
-
-                if ($solicitud->tecnico_asignado_id) {
-                    NotificacionHelper::enviar(
-                        $solicitud->tecnico_asignado_id,
-                        'Solicitud cerrada',
-                        "La solicitud #{$solicitud->id} ha sido cerrada oficialmente. Buen trabajo! 🎉",
-                        'success',
-                        "/mis-trabajos",
-                        $solicitud->id
-                    );
-                }
                 break;
 
             default:
@@ -509,27 +434,101 @@ class SolicitudController extends Controller
         ]);
     }
 
-
-    public function agregarFirmas($id)
+// =====================================================================
+// Agregar firmas a la solicitud desde los usuarios relacionados (solicitante, jefe de sección, jefe de activos, conformidad, jefe de mantenimiento)
+// =====================================================================
+    public function agregarFirmas($id, Request $request = null)
     {
         $solicitud = Solicitud::findOrFail($id);
+        $tipo = $request ? $request->input('tipo', 'todas') : 'todas';
         
-        // Usar el modelo User en lugar de DB::table para obtener las firmas
-        $solicitante = User::find($solicitud->solicitante_id);
-        $jefeSeccion = User::find($solicitud->jefe_seccion_id);
-        $jefeActivos = User::find($solicitud->jefe_activos_id);
-        $conformacion = User::find($solicitud->conformacion_id ?? $solicitud->solicitante_id);
-        $jefeMantenimiento = User::find($solicitud->jefe_mantenimiento_id);
+        $actualizadas = [];
         
-        $solicitud->update([
-            'solicitante_firma_imagen' => $solicitante ? $solicitante->firma_digital : null,
-            'jefe_seccion_firma_imagen' => $jefeSeccion ? $jefeSeccion->firma_digital : null,
-            'jefe_activos_firma_imagen' => $jefeActivos ? $jefeActivos->firma_digital : null,
-            'conformacion_firma_imagen' => $conformacion ? $conformacion->firma_digital : null,
-            'jefe_mantenimiento_firma_imagen' => $jefeMantenimiento ? $jefeMantenimiento->firma_digital : null,
+        // Solicitante
+        if (($tipo === 'todas' || $tipo === 'solicitante') && $solicitud->solicitante_id) {
+            $actualizado = DB::update("
+                UPDATE solicitudes 
+                SET solicitante_firma_imagen = (
+                    SELECT firma_digital FROM usuarios WHERE id = ?
+                )
+                WHERE id = ? AND solicitante_firma_imagen IS NULL
+            ", [$solicitud->solicitante_id, $solicitud->id]);
+            
+            if ($actualizado) $actualizadas[] = 'solicitante';
+        }
+        
+        // Jefe de Sección
+        if (($tipo === 'todas' || $tipo === 'jefe_seccion') && $solicitud->jefe_seccion_id) {
+            $actualizado = DB::update("
+                UPDATE solicitudes 
+                SET jefe_seccion_firma_imagen = (
+                    SELECT firma_digital FROM usuarios WHERE id = ?
+                )
+                WHERE id = ? AND jefe_seccion_firma_imagen IS NULL
+            ", [$solicitud->jefe_seccion_id, $solicitud->id]);
+            
+            if ($actualizado) $actualizadas[] = 'jefe_seccion';
+        }
+        
+        // Jefe de Activos
+        if (($tipo === 'todas' || $tipo === 'jefe_activos') && $solicitud->jefe_activos_id) {
+            $actualizado = DB::update("
+                UPDATE solicitudes 
+                SET jefe_activos_firma_imagen = (
+                    SELECT firma_digital FROM usuarios WHERE id = ?
+                )
+                WHERE id = ? AND jefe_activos_firma_imagen IS NULL
+            ", [$solicitud->jefe_activos_id, $solicitud->id]);
+            
+            if ($actualizado) $actualizadas[] = 'jefe_activos';
+        }
+        
+        // Conformidad - SOLO si YA se firmó la conformidad
+        if ($tipo === 'todas' || $tipo === 'conformacion') {
+            // ⚠️ CORREGIDO: Solo si conformacion_firmo_en NO es NULL
+            if ($solicitud->conformacion_firmo_en) {
+                $userId = $solicitud->conformacion_id ?? $solicitud->solicitante_id;
+                if ($userId) {
+                    $actualizado = DB::update("
+                        UPDATE solicitudes 
+                        SET conformacion_firma_imagen = (
+                            SELECT firma_digital FROM usuarios WHERE id = ?
+                        )
+                        WHERE id = ? AND conformacion_firma_imagen IS NULL
+                    ", [$userId, $solicitud->id]);
+                    
+                    if ($actualizado) $actualizadas[] = 'conformacion';
+                }
+            }
+        }
+        
+        // Jefe de Mantenimiento
+        if (($tipo === 'todas' || $tipo === 'jefe_mantenimiento') && $solicitud->jefe_mantenimiento_id) {
+            $actualizado = DB::update("
+                UPDATE solicitudes 
+                SET jefe_mantenimiento_firma_imagen = (
+                    SELECT firma_digital FROM usuarios WHERE id = ?
+                )
+                WHERE id = ? AND jefe_mantenimiento_firma_imagen IS NULL
+            ", [$solicitud->jefe_mantenimiento_id, $solicitud->id]);
+            
+            if ($actualizado) $actualizadas[] = 'jefe_mantenimiento';
+        }
+        
+        $solicitud->refresh();
+        
+        Log::info('Firmas actualizadas para solicitud #' . $id, [
+            'tipo' => $tipo,
+            'actualizadas' => $actualizadas
         ]);
         
-        return response()->json(['success' => true, 'message' => 'Firmas actualizadas']);
+        return response()->json([
+            'success' => true, 
+            'message' => count($actualizadas) > 0 ? 'Firmas actualizadas correctamente' : 'No había firmas pendientes',
+            'tipo' => $tipo,
+            'campos_actualizados' => $actualizadas,
+            'data' => $solicitud->load(['solicitante', 'jefeSeccion', 'jefeActivos', 'jefeMantenimiento', 'conformacion'])
+        ]);
     }
     /**
      * Asignar técnico

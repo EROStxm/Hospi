@@ -1,13 +1,14 @@
-// src/componentes/comunes/ModalFirma.jsx
 import { useState, useEffect } from 'react';
 import { FiX, FiEdit3, FiCheckCircle, FiTrash2 } from 'react-icons/fi';
 import CanvasFirma from './CanvasFirma';
 import api from '../../servicios/api';
+import { API_URL } from '../../utiles/constantes'; // ← IMPORTAR API_URL
 import toast from 'react-hot-toast';
 import './ModalFirma.css';
 
 const ModalFirma = ({ onClose, onFirmaLista, obligatorio = false }) => {
   const [firmaActual, setFirmaActual] = useState(null);
+  const [firmaUrl, setFirmaUrl] = useState(null); // ← NUEVO: URL completa de la imagen
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [modoDibujar, setModoDibujar] = useState(false);
@@ -23,6 +24,17 @@ const ModalFirma = ({ onClose, onFirmaLista, obligatorio = false }) => {
       const res = await api.get('/mi-firma');
       if (res.data?.tiene_firma) {
         setFirmaActual(res.data.firma_digital);
+        
+        // Construir URL completa para la imagen
+        if (res.data.firma_base64) {
+          // Si el backend devuelve base64, usarlo directamente
+          setFirmaUrl(res.data.firma_base64);
+        } else if (res.data.firma_digital) {
+          // Si no, construir URL completa
+          const baseUrl = API_URL.replace('/api', ''); // Quitar /api del final
+          setFirmaUrl(baseUrl + res.data.firma_digital);
+        }
+        
         setModoDibujar(false);
       } else {
         setModoDibujar(true);
@@ -40,6 +52,7 @@ const ModalFirma = ({ onClose, onFirmaLista, obligatorio = false }) => {
       setGuardando(true);
       await api.post('/mi-firma', { firma: dataUrl });
       setFirmaActual(dataUrl);
+      setFirmaUrl(dataUrl); // El dataUrl ya es base64, se puede usar directamente
       setModoDibujar(false);
       toast.success('✅ Firma guardada correctamente');
       onFirmaLista?.(dataUrl);
@@ -56,6 +69,7 @@ const ModalFirma = ({ onClose, onFirmaLista, obligatorio = false }) => {
     try {
       await api.delete('/mi-firma');
       setFirmaActual(null);
+      setFirmaUrl(null);
       setModoDibujar(true);
       toast.success('Firma eliminada');
     } catch (e) {
@@ -98,7 +112,19 @@ const ModalFirma = ({ onClose, onFirmaLista, obligatorio = false }) => {
             <>
               <div className="firma-preview-label">Su firma registrada:</div>
               <div className="firma-preview-box">
-                <img src={firmaActual} alt="Firma digital" />
+                {firmaUrl ? (
+                  <img 
+                    src={firmaUrl} 
+                    alt="Firma digital" 
+                    style={{ maxWidth: '100%', maxHeight: '150px' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      console.error('Error cargando imagen:', firmaUrl);
+                    }}
+                  />
+                ) : (
+                  <p style={{ color: '#999' }}>No se pudo cargar la firma</p>
+                )}
               </div>
               <div className="firma-preview-actions">
                 <button className="btn-firma-rehacer" onClick={() => setModoDibujar(true)}>

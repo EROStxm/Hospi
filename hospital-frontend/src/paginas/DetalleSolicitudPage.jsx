@@ -472,16 +472,53 @@ const DetalleSolicitudPage = () => {
     }
   };
   // Función (después de handleVerQr)
-  const handleAgregarFirmasPdf = async () => {
+  // Agregar TODAS las firmas (solo admin)
+const handleAgregarTodasLasFirmas = async () => {
+  try {
+    setCargandoAccion(true);
+    toast.loading('Agregando todas las firmas...', { id: 'firmas' });
+    
+    const response = await api.post(`/solicitudes/${id}/agregar-firmas`);
+    
+    if (response.data.success) {
+      toast.success('✅ Todas las firmas agregadas al PDF', { id: 'firmas' });
+      await cargarSolicitud(); // Recargar para ver cambios
+    } else {
+      toast.error('Error al agregar firmas', { id: 'firmas' });
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    toast.error('Error al agregar firmas: ' + (error.response?.data?.message || error.message), { id: 'firmas' });
+  } finally {
+    setCargandoAccion(false);
+  }
+};
+
+// Agregar una firma específica
+  const handleAgregarFirmaEspecifica = async (tipo) => {
     try {
       setCargandoAccion(true);
-      const response = await api.post(`/solicitudes/${id}/agregar-firmas`);
+      const nombresTipos = {
+        'solicitante': 'Solicitante',
+        'jefe_seccion': 'Jefe de Servicio',
+        'jefe_activos': 'Jefe de Activos',
+        'conformacion': 'Conformidad',
+        'jefe_mantenimiento': 'Jefe de Mantenimiento'
+      };
+      
+      toast.loading(`Agregando firma de ${nombresTipos[tipo]}...`, { id: 'firma-especifica' });
+      
+      const response = await api.post(`/solicitudes/${id}/agregar-firmas`, { tipo: tipo });
+      
       if (response.data.success) {
-        toast.success('✅ Firmas agregadas al PDF correctamente');
-        cargarSolicitud();
+        toast.success(`✅ Firma de ${nombresTipos[tipo]} agregada`, { id: 'firma-especifica' });
+        await cargarSolicitud(); // Recargar para ver cambios
+      } else {
+        toast.error('Error al agregar firma', { id: 'firma-especifica' });
       }
     } catch (error) {
-      toast.error('Error al agregar firmas');
+      console.error('Error:', error);
+      toast.error('Error: ' + (error.response?.data?.message || error.message), { id: 'firma-especifica' });
     } finally {
       setCargandoAccion(false);
     }
@@ -622,21 +659,129 @@ const DetalleSolicitudPage = () => {
               </button>
             )}
 
-            {/* Botones PDF y QR */}
-            <button className="btn-accion btn-pdf" onClick={handleGenerarPdf}>
-              <FiDownload /> Descargar PDF
-            </button>
-
-            <button className="btn-accion btn-qr" onClick={handleVerQr}>
-              <FiCode /> Ver QR
-            </button>
             
-            {/* Botón para agregar firmas al PDF */}
-            <button className="btn-accion btn-firma" onClick={handleAgregarFirmasPdf} disabled={cargandoAccion}>
-              <FiEdit2 /> Agregar Firmas al PDF
-            </button>
           </div>
         </div>
+
+        {/* Botones PDF, QR y Firmas */}
+          <div className="acciones-card">
+            <h3>📄 Documentos y Firmas</h3>
+            <div className="acciones-botones">
+              {/* Botón PDF - Visible para todos */}
+              <button className="btn-accion btn-pdf" onClick={handleGenerarPdf}>
+                <FiDownload /> Descargar PDF
+              </button>
+
+              {/* Botón QR - Visible para todos */}
+              <button className="btn-accion btn-qr" onClick={handleVerQr}>
+                <FiCode /> Ver QR
+              </button>
+              
+              {/* SOLO ADMIN: Botón para agregar TODAS las firmas */}
+              {usuarioActual?.rol?.nombre === 'admin_sistema' && (
+                <button 
+                  className="btn-accion btn-firma-todas" 
+                  onClick={handleAgregarTodasLasFirmas} 
+                  disabled={cargandoAccion}
+                  style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white' }}
+                >
+                  <FiEdit2 /> {cargandoAccion ? 'Agregando...' : 'Agregar TODAS las Firmas'}
+                </button>
+              )}
+
+              {/* SOLICITANTE: Solo ve su propia firma si falta */}
+              {usuarioActual?.id === solicitud?.solicitante_id && 
+              solicitud?.solicitante_firmo_en && 
+              !solicitud?.solicitante_firma_imagen && (
+                <button 
+                  className="btn-accion btn-firma-individual"
+                  onClick={() => handleAgregarFirmaEspecifica('solicitante')}
+                  disabled={cargandoAccion}
+                >
+                  <FiUser /> Agregar Mi Firma (Solicitante)
+                </button>
+              )}
+
+              {/* JEFE DE SERVICIO: El que firmó como jefe_seccion */}
+              {usuarioActual?.id === solicitud?.jefe_seccion_id && 
+              solicitud?.jefe_seccion_firmo_en && 
+              !solicitud?.jefe_seccion_firma_imagen && (
+                <button 
+                  className="btn-accion btn-firma-individual"
+                  onClick={() => handleAgregarFirmaEspecifica('jefe_seccion')}
+                  disabled={cargandoAccion}
+                >
+                  <FiUser /> Agregar Mi Firma (Jefe Servicio)
+                </button>
+              )}
+
+              {/* JEFE DE ACTIVOS: El que firmó como jefe_activos */}
+              {usuarioActual?.id === solicitud?.jefe_activos_id && 
+              solicitud?.jefe_activos_firmo_en && 
+              !solicitud?.jefe_activos_firma_imagen && (
+                <button 
+                  className="btn-accion btn-firma-individual"
+                  onClick={() => handleAgregarFirmaEspecifica('jefe_activos')}
+                  disabled={cargandoAccion}
+                >
+                  <FiUser /> Agregar Mi Firma (Jefe Activos)
+                </button>
+              )}
+
+              {/* SOLICITANTE: Ve su conformidad si falta */}
+              {usuarioActual?.id === solicitud?.solicitante_id && 
+              solicitud?.conformacion_firmo_en && 
+              !solicitud?.conformacion_firma_imagen && (
+                <button 
+                  className="btn-accion btn-firma-individual"
+                  onClick={() => handleAgregarFirmaEspecifica('conformacion')}
+                  disabled={cargandoAccion}
+                >
+                  <FiUser /> Agregar Mi Firma (Conformidad)
+                </button>
+              )}
+
+              {/* JEFE DE MANTENIMIENTO: El que firmó como jefe_mantenimiento */}
+              {usuarioActual?.id === solicitud?.jefe_mantenimiento_id && 
+              solicitud?.jefe_mantenimiento_firmo_en && 
+              !solicitud?.jefe_mantenimiento_firma_imagen && (
+                <button 
+                  className="btn-accion btn-firma-individual"
+                  onClick={() => handleAgregarFirmaEspecifica('jefe_mantenimiento')}
+                  disabled={cargandoAccion}
+                >
+                  <FiUser /> Agregar Mi Firma (Jefe Mantenimiento)
+                </button>
+              )}
+            </div>
+            
+            {/* Mostrar estado de las firmas */}
+            <div className="firmas-estado" style={{ marginTop: '15px' }}>
+              <h4>Estado de Firmas en PDF:</h4>
+              <div className="firmas-estado-grid">
+                <div className={`firma-estado-item ${solicitud?.solicitante_firma_imagen ? 'completa' : 'pendiente'}`}>
+                  <span>Solicitante:</span>
+                  <strong>{solicitud?.solicitante_firma_imagen ? '✅' : '❌'}</strong>
+                </div>
+                <div className={`firma-estado-item ${solicitud?.jefe_seccion_firma_imagen ? 'completa' : 'pendiente'}`}>
+                  <span>Jefe Servicio:</span>
+                  <strong>{solicitud?.jefe_seccion_firma_imagen ? '✅' : '❌'}</strong>
+                </div>
+                <div className={`firma-estado-item ${solicitud?.jefe_activos_firma_imagen ? 'completa' : 'pendiente'}`}>
+                  <span>Jefe Activos:</span>
+                  <strong>{solicitud?.jefe_activos_firma_imagen ? '✅' : '❌'}</strong>
+                </div>
+                <div className={`firma-estado-item ${solicitud?.conformacion_firma_imagen ? 'completa' : 'pendiente'}`}>
+                  <span>Conformidad:</span>
+                  <strong>{solicitud?.conformacion_firma_imagen ? '✅' : '❌'}</strong>
+                </div>
+                <div className={`firma-estado-item ${solicitud?.jefe_mantenimiento_firma_imagen ? 'completa' : 'pendiente'}`}>
+                  <span>Jefe Mant.:</span>
+                  <strong>{solicitud?.jefe_mantenimiento_firma_imagen ? '✅' : '❌'}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
 
         {/* Quién debe firmar */}
         <div className="info-card firmas-pendientes">
